@@ -1,0 +1,12 @@
+# ของฝั่ง Backend และโฟลเดอร์ขยะทั่วไป
+node_modules/
+.env
+
+# ของฝั่ง Frontend (Next.js)
+.next/
+out/
+build/
+
+# ของระบบปฎิบัติการ
+.DS_Store
+Thumbs.db

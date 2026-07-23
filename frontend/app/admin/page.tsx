@@ -2,7 +2,7 @@
 
 import Sidebar from "@/components/shared/Sidebar";
 import TopBar from "@/components/shared/TopBar";
-import { StatCard, StatusCard } from "@/components/shared/StatCard";
+import { StatusCard } from "@/components/shared/StatCard";
 import EnergyConsumptionChart from "@/components/charts/EnergyConsumptionChart";
 import TotalEnergyChart from "@/components/charts/TotalEnergyChart";
 import MapCard from "@/components/MapCard";
@@ -17,13 +17,19 @@ export default function AdminPage() {
       <Sidebar />
       <main className="flex-1">
         <TopBar />
-         
-         <EnergyConsumptionChart />
-         <TotalEnergyChart />
-         <MapCard/>
-         <DeviceStatusTable />
+         <h1
+            className="mb-[40px] mt-[20px] font-bold px-[6px] py-[10px] rounded-card shadow-card text-center text-[25px] " 
+            style={{ color: theme.page.heading }}
+          >
+            Smart energy management system in academic building
+          </h1>
+        <StatusCard/>
+        <EnergyConsumptionChart />
+        <TotalEnergyChart />
+        <MapCard />
+        <DeviceStatusTable />
         <RecentAlertsList />
-        <AIInsightsPanel /> 
+        <AIInsightsPanel />
       </main>
     </div>
   );

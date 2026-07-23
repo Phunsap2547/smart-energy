@@ -13,7 +13,7 @@ export default function EnergyManagementPage() {
 
         <div className="px-8 pb-10">
           <h1
-            className="text-xl font-bold bg-white px-6 py-3 rounded-card shadow-card text-center"
+            className="mb-[40px] mt-[20px] font-bold px-[6px] py-[10px] rounded-card shadow-card text-center text-[25px] " 
             style={{ color: theme.page.heading }}
           >
             Smart energy management system in academic building

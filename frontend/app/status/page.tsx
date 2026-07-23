@@ -26,7 +26,7 @@ export default function StatusPage() {
           {/* หัวข้อโปรเจกต์เด่นตรงกลางสีขาว */}
           <div className="grid place-items-center w-full mb-[30px]">
             <h1
-              className="text-xl font-bold bg-white px-6 py-3 rounded-card shadow-card text-center"
+            className="mb-[40px] mt-[2px] font-bold px-[6px] py-[10px] rounded-card shadow-card text-center text-[25px] " 
               style={{ color: theme.page.heading }}
             >
               Smart energy management system in academic building

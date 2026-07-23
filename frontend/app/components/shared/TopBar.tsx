@@ -7,7 +7,7 @@ import theme from "@/config/theme.js";
 export default function TopBar() {
   return (
     <div
-      className="w-full rounded-b-3xl px-8px pt-6 h-[49px] -mb-12px"
+      className="w-full  px-[8px] pt-[1px] h-[49px] -mb-[12px]"
       style={{
         background: `linear-gradient(90deg, ${theme.topbar.gradientFrom} 0%, ${theme.topbar.gradientTo} 100%)`,
       }}

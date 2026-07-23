@@ -14,9 +14,17 @@ interface StatCardProps {
 }
 
 // การ์ดแบบปกติ (เขียว / น้ำเงิน / เหลือง) — สไตล์คุมด้วย theme.stats
-export function StatCard({ icon, title, value, unit, badgeText, variant }: StatCardProps) {
-  const colors = theme.stats[variant];
-
+ export function StatCard({ icon, title, value, unit, badgeText, variant }: StatCardProps) {
+   const colors = theme.stats[variant];
+// export function StatCard({ icon, title, value, unit, badgeText, variant }: StatCardProps) {
+//   // 🟢 เซฟตัวเองด้วยการดึงสีสำรองมาใช้ถ้าดึงค่าปกติไม่เจอ
+//   const colors = theme?.stats?.[variant] || theme?.stats?.energyToday || {
+//     border: "#e5e7eb",
+//     iconBg: "#f3f4f6",
+//     iconColor: "#000000",
+//     badgeBg: "#f3f4f6",
+//     badgeText: "#000000"
+//   };
   return (
     <div
       className="flex-[5px] rounded-[20px] bg-white p-[20px] shadow-card border-[10px] h-[180px] w-[5px]"
@@ -70,7 +78,7 @@ export function StatusCard({ icon, count, label }: StatusCardProps) {
 
   return (
     <div
-      className="flex-[5px]  p-[4px] shadow-card border-[10px] rounded-[20px] "
+      className="flex-[5px] p-[4px] shadow-card border-[10px] rounded-[20px] "
       style={{
         backgroundColor: colors.background,
         borderColor: "#d4d4d4",
@@ -105,7 +113,7 @@ export function StatusCard({ icon, count, label }: StatusCardProps) {
       </div>
 
       <Link
-        href="/admin/status" // เปลี่ยนเป็น path ของหน้าคู่ขนานที่คุณต้องการให้ไป
+        href="/status" // เปลี่ยนเป็น path ของหน้าคู่ขนานที่คุณต้องการให้ไป
         className="text-[16px] font-semibold underline-offset-2 ml-[12px]"
         style={{ backgroundColor: theme.stats.status.adminPillBg 
         }}

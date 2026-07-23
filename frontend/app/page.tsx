@@ -18,7 +18,7 @@ export default function DashboardPage() {
 
         <div className="px-[8px] pb-[20px] relative">
           <h1
-            className="mb-[30px] bg-white px-[6px] py-[10px] rounded-card shadow-card text-center " 
+            className="mb-[40px] mt-[20px] font-bold px-[6px] py-[10px] rounded-card shadow-card text-center text-[25px] " 
             style={{ 
               color: theme.page.heading }}
           >

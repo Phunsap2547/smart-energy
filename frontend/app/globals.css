@@ -1,4 +1,4 @@
-@import "tailwindcss";
+/* @import "tailwindcss";
 
 :root {
   --background: #ffffff;
@@ -23,4 +23,93 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+} */
+
+@import "tailwindcss";
+
+:root {
+  /* ---------- Page Background & General ---------- */
+  --background: #e4ece8;
+  --foreground: #171717;
+  --card-background: #ffffff;
+  --page-heading: #1f4d2c;
+
+  /* ---------- Sidebar ---------- */
+  --sidebar-gradient-from: #173620;
+  --sidebar-gradient-to: #5a9a6d;
+  --sidebar-text-active: #ffffff;
+  --sidebar-text-inactive: #d9ead9;
+  --sidebar-smart-pill-bg: rgba(255, 255, 255, 0.18);
+  --sidebar-active-item-bg: rgba(255, 255, 255, 0.15);
+
+  /* ---------- Topbar ---------- */
+  --topbar-gradient-from: #173620;
+  --topbar-gradient-to: #5a9a6d;
+  --topbar-admin-pill-bg: rgba(255, 255, 255, 0.18);
+  --topbar-admin-text: #ffffff;
+
+  /* ---------- Stats Cards ---------- */
+  --stats-energy-border: #2f7d43;
+  --stats-energy-icon-bg: #eaf7ee;
+  --stats-energy-icon-color: #2f7d43;
+  --stats-energy-badge-bg: #2f7d43;
+  --stats-energy-badge-text: #ffffff;
+
+  --stats-power-border: #2f6fed;
+  --stats-power-icon-bg: #eaf1ff;
+  --stats-power-icon-color: #2f6fed;
+  --stats-power-badge-bg: #2f6fed;
+  --stats-power-badge-text: #ffffff;
+
+  --stats-factor-border: #f1b400;
+  --stats-factor-icon-bg: #fff8e6;
+  --stats-factor-icon-color: #c98f00;
+  --stats-factor-badge-bg: #f1b400;
+  --stats-factor-badge-text: #5a4200;
+
+  --stats-status-bg: #e23c3c;
+  --stats-status-icon-color: #ffffff;
+  --stats-status-heading: #ffffff;
+  --stats-status-text: #0f0f0f;
+
+  /* ---------- Chart & Panels ---------- */
+  --panel-consumption-from: #7fc4c4;
+  --panel-consumption-to: #5fb3c9;
+  --panel-live-badge-bg: #e23c3c;
+  --panel-live-badge-text: #ffffff;
+
+  --panel-total-from: #a190d8;
+  --panel-total-to: #8b73c9;
+  --panel-total-bar: #6f4fa0;
+  
+  --panel-map-header: #2f4d3a;
+
+  /* ---------- Borders & Shadows ---------- */
+  --radius-card: 16px;
+  --radius-pill: 999px;
+  --shadow-card: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+/* ลงทะเบียนตัวแปรกับ Tailwind v4 engine */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card-background);
+  
+  /* เพิ่ม Utility class สำหรับฟอนต์ Kanit ตามที่คุณตั้งค่าไว้ */
+  --font-sans: 'Kanit', 'Segoe UI', sans-serif;
+  --font-heading: 'Kanit', 'Segoe UI', sans-serif;
+
+  /* ลงทะเบียนสีเพื่อให้เรียกใช้ผ่าน utility เช่น bg-sidebar-from หรือ text-page-heading */
+  --color-sidebar-from: var(--sidebar-gradient-from);
+  --color-sidebar-to: var(--sidebar-gradient-to);
+  --color-page-heading: var(--page-heading);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Kanit', 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

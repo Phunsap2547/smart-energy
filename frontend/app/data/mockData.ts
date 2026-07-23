@@ -31,3 +31,31 @@ export const buildingLocation = {
   lat: 17.1664,
   lng: 104.1486,
 };
+
+export const deviceStatus = [
+  { id: 1, name: "Meter #1", status: "online" as const },
+  // เพิ่ม meter อื่นๆ ได้ที่นี่
+];
+
+export const recentAlerts = [
+  {
+    id: 1,
+    date: "Today 12.00 AM",
+    message: "แจ้งเตือนไฟฟ้า PF ต่ำ",
+    severity: "warning" as const,
+  },
+];
+
+export const aiInsight = {
+  text: "การใช้พลังงานผิดปกติในอาคาร ใช้พลังงานมากกว่าปกติ 28% ในวันนี้",
+};
+
+// สถานะปัจจุบันของอาคาร (ค่าที่ระบบวัดได้แบบ real-time)
+export const buildingStatus = {
+  name: "อาคาร 22 ปฏิบัติการ",
+  voltage: 198,        // V (ปกติ 210-230)
+  current: 42,          // A
+  powerFactor: 0.68,    // ปกติควร > 0.85
+  baselineCurrent: 25,  // ค่าเฉลี่ยปกติ เอาไว้เทียบไฟกระชาก
+};
+

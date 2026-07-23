@@ -10,13 +10,13 @@ export default function MapCard() {
   return (
     <div className="rounded-card overflow-hidden shadow-card bg-white">
       <div
-        className="flex items-center gap-[2px] px-[350px] py-[10px] font-medium text-[22px] ml-[90px]"
+        className="flex items-center gap-[2px] px-[20px] py-[10px] font-medium text-[22px] ml-[10px]"
         style={{ color: theme.panels.map.headerColor }}
       >
         <MapPin size={26} />
         Map
       </div>
-      <div className="h-[800px] w-[1300px] px-[150px] ml-[230px]">
+      <div className="h-[1000px] w-[1300px] px-[150px] ml-[2px]">
         <iframe
           title="building-location"
           src={mapSrc}

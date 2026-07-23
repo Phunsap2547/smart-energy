@@ -19,6 +19,7 @@ const theme = {
     smartPillBg: "rgba(255,255,255,0.18)",
     textInactive: "#d9ead9",
     activeItemBg: "rgba(255,255,255,0.15)",
+    smartPillBg: "rgba(255,255,255,0.15)", 
   },
 
   // ---------- Top header bar ----------
@@ -69,6 +70,7 @@ const theme = {
       iconColor: "#ffffff",
       textheading: "#ffffff",
       text: "#0f0f0f",
+      adminPillBg: "rgb(255, 255, 255)",
     },
   },
 
@@ -113,6 +115,12 @@ const theme = {
   shadow: {
     card: "0 4px 14px rgba(0,0,0,0.06)",
   },
+
+   colors: {
+    primary: "#2E7D32",
+    // ...
+  },
+
 };
 
 module.exports = theme;

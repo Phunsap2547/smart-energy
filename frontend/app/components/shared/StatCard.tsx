@@ -2,6 +2,7 @@
 
 import { ReactNode } from "react";
 import theme from "@/config/theme.js";
+import Link from "next/link";
 
 interface StatCardProps {
   icon: ReactNode;
@@ -19,14 +20,15 @@ export function StatCard({ icon, title, value, unit, badgeText, variant }: StatC
   return (
     <div
       className="flex-[5px] rounded-[20px] bg-white p-[20px] shadow-card border-[10px] h-[180px] w-[5px]"
-      style={{ borderColor: colors.border,
+      style={{
+        borderColor: colors.border,
         boxShadow: `
           inset 0 4px 4px rgba(255, 255, 255, 0.4),
           inset 0 -4px 6px rgba(0, 0, 0, 0.3),
           0 10px 20px rgba(0, 0, 0, 0.3),
           0 4px 6px rgba(109, 102, 102, 0.2)
         `
-       }}
+      }}
     >
       {/* ส่วนบน: ไอคอน และ ชื่อของการ์ด */}
       <div className="flex items-center gap-[10px] text-[30px] ">
@@ -48,7 +50,7 @@ export function StatCard({ icon, title, value, unit, badgeText, variant }: StatC
       {/* ส่วนล่าง: Badge สถานะ */}
       <span
         className="inline-block text-s font-semibold px-[2px] py-[0.5px] rounded  ml-[10px] rounded-[5px] text-[20px]"
-        style={{ backgroundColor: colors.badgeBg, color: colors.badgeText ,  }}
+        style={{ backgroundColor: colors.badgeBg, color: colors.badgeText, }}
       >
         {badgeText}
       </span>
@@ -69,44 +71,47 @@ export function StatusCard({ icon, count, label }: StatusCardProps) {
   return (
     <div
       className="flex-[5px]  p-[4px] shadow-card border-[10px] rounded-[20px] "
-      style={{ backgroundColor: colors.background, 
-            borderColor:"#d4d4d4",
-            boxShadow: `
+      style={{
+        backgroundColor: colors.background,
+        borderColor: "#d4d4d4",
+        boxShadow: `
           inset 0 4px 4px rgba(255, 255, 255, 0.4),
           inset 0 -4px 6px rgba(0, 0, 0, 0.3),
           0 10px 20px rgba(0, 0, 0, 0.3),
           0 4px 6px rgba(109, 102, 102, 0.2)
         `
         /* border: theme.stats.status.border*/
-          }} 
+      }}
     >
       <div className="flex items-center mb-[3px] py-[5px] px-[20px]">
         <div className=" rounded-lg flex items-center justify-center bg-white/20  ">
           {icon}
         </div>
-        <span className="text-[25px] px-[20px]" 
-        style={{ color: colors.textheading }}>
+        <span className="text-[25px] px-[20px]"
+          style={{ color: colors.textheading }}>
           Status
         </span>
       </div>
 
       <div className="flex items-baseline gap-[60px] mb-[18px] text-[25px] px-[100px]">
-        <span className="text-[30px]  font-bold" 
-        style={{ color: colors.textheading  }}>
+        <span className="text-[30px]  font-bold"
+          style={{ color: colors.textheading }}>
           {count}
         </span>
-        <span className="text-sm" 
-        style={{ color: colors.textheading }}>
+        <span className="text-sm"
+          style={{ color: colors.textheading }}>
           {label}
         </span>
       </div>
 
-      <button
-        className="text-[16px] font-semibold underline underline-offset-2 ml-[12px]"
-        style={{ color: colors.text }}
+      <Link
+        href="/admin/status" // เปลี่ยนเป็น path ของหน้าคู่ขนานที่คุณต้องการให้ไป
+        className="text-[16px] font-semibold underline-offset-2 ml-[12px]"
+        style={{ backgroundColor: theme.stats.status.adminPillBg 
+        }}
       >
         View Details ›
-      </button>
+      </Link>
     </div>
   );
 }

@@ -20,6 +20,25 @@ const theme = {
     textInactive: "#d9ead9",
     activeItemBg: "rgba(255,255,255,0.15)",
     smartPillBg: "rgba(255,255,255,0.15)", 
+    
+    buildingDetail: {
+  dark: {
+    pageBg: "#0b1220",
+    panelBg: "#111a2e",
+    cardBg: "#16213a",
+    border: "#1f2c47",
+    textPrimary: "#ffffff",
+    textSecondary: "#94a3b8",
+  },
+  light: {
+    pageBg: "#f4f6f5",
+    panelBg: "#ffffff",
+    cardBg: "#ffffff",
+    border: "#e5e7eb",
+    textPrimary: "#1f2937",
+    textSecondary: "#6b7280",
+  },
+},
   },
 
   // ---------- Top header bar ----------

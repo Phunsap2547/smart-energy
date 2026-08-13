@@ -2,13 +2,8 @@
 
 import Sidebar from "@/components/shared/Sidebar";
 import TopBar from "@/components/shared/TopBar";
-import { StatusCard } from "@/components/shared/StatCard";
 import EnergyConsumptionChart from "@/components/charts/EnergyConsumptionChart";
 import TotalEnergyChart from "@/components/charts/TotalEnergyChart";
-import MapCard from "@/components/MapCard";
-import DeviceStatusTable from "@/components/admin/DeviceStatusTable";
-import RecentAlertsList from "@/components/admin/RecentAlertsList";
-import AIInsightsPanel from "@/components/admin/AIInsightsPanel";
 import theme from "@/config/theme.js";
 
 export default function AdminPage() {
@@ -23,12 +18,7 @@ export default function AdminPage() {
           >
             Smart energy management system in academic building
           </h1>
-        <EnergyConsumptionChart />
-        <TotalEnergyChart />
-        <MapCard />
-        <DeviceStatusTable />
-        <RecentAlertsList />
-        <AIInsightsPanel />
+       
       </main>
     </div>
   );

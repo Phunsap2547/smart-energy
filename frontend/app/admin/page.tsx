@@ -23,7 +23,6 @@ export default function AdminPage() {
           >
             Smart energy management system in academic building
           </h1>
-        <StatusCard/>
         <EnergyConsumptionChart />
         <TotalEnergyChart />
         <MapCard />

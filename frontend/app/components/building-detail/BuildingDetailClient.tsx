@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import theme from "@/config/theme.js";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import Buildingrightpanel from "./Buildingrightpanel";
 import EnergyConsumptionChart from "@/components/charts/EnergyConsumptionChart";
 import TotalEnergyChart, { CostIcon } from "@/components/charts/TotalEnergyChart";
-import TopBar from "@/components/shared/TopBar";
 import {
   ENERGY_TODAY,
   COST_ESTIMATE,
@@ -80,23 +81,84 @@ export default function BuildingDetailClient({ building }: Props) {
         } as React.CSSProperties
       }
     >
-      {/* <TopBar
-        range={range}
-        onRangeChange={setRange}
-        darkMode={darkMode}
-        onToggleDarkMode={() => setDarkMode((d) => !d)}
-      /> */}
+      {/* header: ปุ่มกลับ + range selector + dark mode toggle */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 18,
+          background: `linear-gradient(90deg, ${theme.topbar.gradientFrom} 0%, ${theme.topbar.gradientTo} 100%)`
 
-  {/* <TopBar
-        range={range}
-        onRangeChange={setRange}
-        darkMode={darkMode}
-        onToggleDarkMode={() => setDarkMode((d) => !d)}
-      /> */}
+        }}
+      >
+        <Link
+          href="/"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            color: "var(--text-secondary)",
+            fontSize: 14,
+            textDecoration: "none",
+          }}
+        >
+          ← กลับไปหน้าแผนที่
+        </Link>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            style={{
+              
+              display: "flex",
+              background: "var(--card-bg)",
+              border: "1px solid var(--border-color)",
+              borderRadius: 20,
+              padding: 3,
+            }}
+          >
+            {(["Day", "Month", "Year", "Total"] as RangeMode[]).map((r) => (
+              <button
+                key={r}
+                onClick={() => setRange(r)}
+                style={{
+                  border: "none",
+                  padding: "7px 16px",
+                  borderRadius: 16,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background: range === r ? "#2563eb" : "transparent",
+                  color: range === r ? "#fff" : "var(--text-secondary)",
+                }}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setDarkMode((d) => !d)}
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: "50%",
+              border: "1px solid var(--border-color)",
+              background: "var(--card-bg)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
+          >
+            🌙
+          </button>
+        </div>
+      </div>
 
       <h1 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 16px" }}>{building.name}</h1>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 18 }}>
+        {/* LEFT column */}
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <div style={{ height: 220, borderRadius: 12, overflow: "hidden" }}>
             <BuildingMap name={building.name} lat={building.lat} lng={building.lng} />
@@ -124,6 +186,7 @@ export default function BuildingDetailClient({ building }: Props) {
           />
         </div>
 
+        {/* RIGHT column */}
         <Buildingrightpanel
           range={range}
           rangeLabel={rangeLabel}

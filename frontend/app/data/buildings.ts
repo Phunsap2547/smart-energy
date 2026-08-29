@@ -7,6 +7,7 @@ export interface BuildingMeter {
   lat: number;
   lng: number;
   status: "Normal" | "Warning" | "Critical";
+  image_url?: string | null;
   //photoUrl: string;
 }
 

@@ -1,27 +1,142 @@
-version: '3.8'
+# version: '3.8'
+
+# services:
+#   database:
+#     image: postgres:16-alpine
+#     container_name: postgres_db
+#     restart: unless-stopped        # (1) เพิ่ม restart policy
+#     ports:
+#       - "5432:5432"
+#     environment:
+#       POSTGRES_USER: ${DB_USER}
+#       POSTGRES_PASSWORD: ${DB_PASSWORD}
+#       POSTGRES_DB: ${DB_NAME}
+#     volumes:
+#       - pg-data:/var/lib/postgresql/data
+#       - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+#     healthcheck:                    # (2) เพิ่ม healthcheck ให้ backend รอ db พร้อมจริงๆ
+#       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+#       interval: 5s
+#       timeout: 5s
+#       retries: 5
+
+#   pgadmin:
+#     image: dpage/pgadmin4
+#     container_name: pgadmin4
+#     restart: unless-stopped
+#     ports:
+#       - "5050:80"
+#     environment:
+#       PGADMIN_DEFAULT_EMAIL: admin@admin.com
+#       PGADMIN_DEFAULT_PASSWORD: admin
+#     volumes:
+#       - pgadmin-data:/var/lib/pgadmin   # (3) นี่คือตัวที่ขาดไป — สำคัญที่สุด
+#     depends_on:
+#       database:
+#         condition: service_healthy
+
+#   backend:
+#     build: ./backend
+#     restart: unless-stopped
+#     ports:
+#       - "5000:5000"
+#     volumes:
+#       - ./backend:/app
+#       - /app/node_modules
+#     depends_on:
+#       database:
+#         condition: service_healthy
+#     environment:
+#       - DB_HOST=database
+#       - DB_PORT=5432
+#       - DB_USER=${DB_USER}
+#       - DB_PASSWORD=${DB_PASSWORD}
+#       - DB_NAME=${DB_NAME}
+#       - JWT_SECRET=${JWT_SECRET}
+#       - INGEST_API_KEY=${INGEST_API_KEY}
+#       - DEVICE_API_KEY=${DEVICE_API_KEY}
+
+#   frontend:
+#     build: ./frontend
+#     restart: unless-stopped
+#     ports:
+#       - "3000:3000"
+#     volumes:
+#       - ./frontend:/app
+#       - /app/node_modules
+#     depends_on:
+#       - backend
+#     environment:
+#       - NEXT_PUBLIC_API_URL=http://localhost:5000
+
+# volumes:
+#   pg-data:
+#   pgadmin-data:      
+
 
 services:
   database:
-    image: mongo:latest
+    image: postgres:16-alpine
+    container_name: postgres_db
+    restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     volumes:
-      - mongo-data:/data/db
+      - pg-data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin4
+    restart: unless-stopped
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      database:
+        condition: service_healthy
 
   backend:
     build: ./backend
+    restart: unless-stopped
     ports:
       - "5000:5000"
+    env_file:
+      - .env                            # <--- แก้ไขตรงนี้ให้ชี้ไปที่ Root .env
     volumes:
       - ./backend:/app
       - /app/node_modules
     depends_on:
-      - database
+      database:
+        condition: service_healthy
     environment:
-      - MONGO_URI=mongodb://database:27017/iot_db
+      - DB_HOST=database
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - JWT_SECRET=${JWT_SECRET}
+      - INGEST_API_KEY=${INGEST_API_KEY}
+      - DEVICE_API_KEY=${DEVICE_API_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
 
   frontend:
     build: ./frontend
+    restart: unless-stopped
     ports:
       - "3000:3000"
     volumes:
@@ -33,4 +148,5 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:5000
 
 volumes:
-  mongo-data:
+  pg-data:
+  pgadmin-data:

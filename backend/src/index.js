@@ -122,7 +122,7 @@ console.log('DEBUG SUPABASE_URL:', process.env.SUPABASE_URL);
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const pool = require('./scripts/db');
+// const pool = require('./scripts/db');
 const { createClient } = require('@supabase/supabase-js');
 
 // --- Supabase Client Configuration ---
@@ -163,12 +163,12 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // --- Database Connections Check ---
-pool.connect()
-  .then(client => {
-    console.log('🐘 PostgreSQL Connected Successfully!');
-    client.release();
-  })
-  .catch(err => console.error('❌ PostgreSQL Connection Error:', err));
+// pool.connect()
+//   .then(client => {
+//     console.log('🐘 PostgreSQL Connected Successfully!');
+//     client.release();
+//   })
+//   .catch(err => console.error('❌ PostgreSQL Connection Error:', err));
 
 if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
   console.log('⚡ Supabase Client Initialized!');

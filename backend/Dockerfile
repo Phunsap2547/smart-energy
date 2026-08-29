@@ -4,4 +4,5 @@ COPY package*.json ./
 RUN npm install
 COPY . .
 EXPOSE 5000
-CMD ["npm", "run", "dev"]
+CMD ["node", "src/index.js"]
+# CMD ["npm", "run", "dev"]

@@ -202,7 +202,7 @@ app.get('/api/energy', async (req, res) => {
       message: 'กรุณาระบุ device_id เช่น /api/energy?device_id=1',
     });
   }
-
+  
   try {
     const { data, error } = await supabase
       .from('energy_readings')

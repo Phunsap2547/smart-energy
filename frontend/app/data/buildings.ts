@@ -8,7 +8,7 @@ export interface BuildingMeter {
   lng: number;
   status: "Normal" | "Warning" | "Critical";
   image_url?: string | null;
-  //photoUrl: string;
+  photoUrl: string;
 }
 
 export const buildings: BuildingMeter[] = [
@@ -18,7 +18,7 @@ export const buildings: BuildingMeter[] = [
     lat: 17.2876875,   
     lng: 104.1073281,  
     status: "Warning",
-    //photoUrl: "/images/building-22.jpg",
+    photoUrl: "/images/building-22.jpg",
   },
   //เพิ่มอาคารถัดไปตรงนี้ เช่น:
   {
@@ -27,6 +27,7 @@ export const buildings: BuildingMeter[] = [
     lat: 17.288381,
     lng: 104.1057858,
     status: "Normal",
+    photoUrl: "/images/building-22.jpg",
   },
 
 ];

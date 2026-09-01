@@ -26,39 +26,6 @@ export const totalEnergyWeekly = [
   { day: "Fri", kwh: 78 },
 ];
 
-// export const buildingLocation = {
-//   name: "Academic Building",
-//   lat: 17.1664,
-//   lng: 104.1486,
-// };
-
-// export const deviceStatus = [
-//   { id: 1, name: "Meter #1", status: "online" as const },
-//   // เพิ่ม meter อื่นๆ ได้ที่นี่
-// ];
-
-// export const recentAlerts = [
-//   {
-//     id: 1,
-//     date: "Today 12.00 AM",
-//     message: "แจ้งเตือนไฟฟ้า PF ต่ำ",
-//     severity: "warning" as const,
-//   },
-// ];
-
-// export const aiInsight = {
-//   text: "การใช้พลังงานผิดปกติในอาคาร ใช้พลังงานมากกว่าปกติ 28% ในวันนี้",
-// };
-
-// // สถานะปัจจุบันของอาคาร (ค่าที่ระบบวัดได้แบบ real-time)
-// export const buildingStatus = {
-//   name: "อาคาร 22 ปฏิบัติการ",
-//   voltage: 198,        // V (ปกติ 210-230)
-//   current: 42,          // A
-//   powerFactor: 0.68,    // ปกติควร > 0.85
-//   baselineCurrent: 25,  // ค่าเฉลี่ยปกติ เอาไว้เทียบไฟกระชาก
-// };
-
 export type RangeMode = "Day" | "Month" | "Year" | "Total";
 
 export interface DeviceIssue {
@@ -151,10 +118,20 @@ export const usageSeries: Record<RangeMode, { label: string; kwh: number }[]> = 
 };
 
 export const costSeries: Record<RangeMode, { label: string; cost: number }[]> = {
-  Day: usageSeries.Day.map((d) => ({ label: d.label, cost: Math.round(d.kwh * 4.1) })),
-  Month: usageSeries.Month.map((d) => ({ label: d.label, cost: Math.round(d.kwh * 4.1) })),
-  Year: usageSeries.Year.map((d) => ({ label: d.label, cost: Math.round(d.kwh * 4.1) })),
-  Total: usageSeries.Total.map((d) => ({ label: d.label, cost: Math.round(d.kwh * 4.1) })),
+  // สำหรับช่วง Day (kW): Real-time Active Power จำลองโหลดการใช้งานในแต่ละช่วงเวลา
+  Day: [
+    { label: "09:00", cost: 68.5 },
+    { label: "09:30", cost: 82.4 },
+    { label: "10:00", cost: 112.0 },
+    { label: "10:30", cost: 117.85 }, // Peak Demand
+    { label: "11:00", cost: 105.2 },
+    { label: "11:30", cost: 98.6 },
+    { label: "12:00", cost: 74.0 },
+  ],
+  // สำหรับช่วง Month, Year, Total คำนวณ Active Power เฉลี่ยที่สมจริงขึ้น (คูณด้วย 1.2 - 1.5)
+  Month: usageSeries.Month.map((d) => ({ label: d.label, cost: Math.round(d.kwh * 0.035) })),
+  Year: usageSeries.Year.map((d) => ({ label: d.label, cost: Math.round(d.kwh * 0.008) })),
+  Total: usageSeries.Total.map((d) => ({ label: d.label, cost: Math.round(d.kwh * 0.0008) })),
 };
 
 export const devices: DeviceIssue[] = [

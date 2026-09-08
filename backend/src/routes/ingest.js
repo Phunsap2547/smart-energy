@@ -14,32 +14,54 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 
 router.use(verifyApiKey);
 
-// POST /api/ingest/readings
-router.post('/readings', async (req, res) => {
-  const {
-    device_id, reading_time,
-    voltage_a, voltage_b, voltage_c,
-    current_a, current_b, current_c,
-    power_kw, energy_kwh,
-  } = req.body;
+// ฟังก์ชันรับและแมปค่ารองรับทั้ง ESP32 (camelCase) และ Database (snake_case)
+const handleIngestReadings = async (req, res) => {
+  const body = req.body;
+
+  // รองรับทั้ง device_id และ meterId
+  const device_id = body.device_id || body.meterId;
 
   if (!device_id) {
     return res.status(400).json({ message: 'กรุณาระบุ device_id' });
   }
 
+  // แปลงค่าจาก ESP32 ให้ลงคอลัมน์ Supabase ถูกต้อง (แก้ปัญหา NULL)
+  const payload = {
+    device_id,
+    reading_time: body.reading_time || new Date().toISOString(),
+
+    // แรงดันไฟฟ้า (ลงทั้ง voltage_system และ voltage_a เพื่อความชัวร์)
+    voltage_system: body.voltageSystemV ?? body.voltage_system ?? null,
+    voltage_a: body.voltage_a ?? body.voltageSystemV ?? null,
+    voltage_b: body.voltage_b ?? null,
+    voltage_c: body.voltage_c ?? null,
+
+    // กระแสไฟฟ้า
+    current_system: body.currentSystemA ?? body.current_system ?? null,
+    current_a: body.current_a ?? body.currentSystemA ?? null,
+    current_b: body.current_b ?? null,
+    current_c: body.current_c ?? null,
+
+    // กำลังไฟฟ้า และ พลังงาน
+    power_kw: body.realPowerKw ?? body.power_kw ?? null,
+    power_a: body.power_a ?? null,
+    power_b: body.power_b ?? null,
+    power_c: body.power_c ?? null,
+    energy_kwh: body.energyKwh ?? body.energy_kwh ?? null,
+
+    // ค่าทางไฟฟ้าอื่นๆ
+    power_factor: body.powerFactor ?? body.power_factor ?? null,
+    frequency_hz: body.frequencyHz ?? body.frequency_hz ?? null,
+    voltage_unbalance_pct: body.voltagePhaseUnbalancePct ?? body.voltage_unbalance_pct ?? null,
+    current_unbalance_pct: body.currentUnbalancePct ?? body.current_unbalance_pct ?? null,
+    thd_voltage_l1_pct: body.thdVoltageL1Pct ?? body.thd_voltage_l1_pct ?? null,
+    thd_current_l1_pct: body.thdCurrentL1Pct ?? body.thd_current_l1_pct ?? null,
+  };
+
   try {
-    // 2. เปลี่ยนมา insert ลง Supabase
     const { data, error } = await supabase
       .from('energy_readings')
-      .insert([
-        {
-          device_id,
-          reading_time: reading_time || new Date().toISOString(),
-          voltage_a, voltage_b, voltage_c,
-          current_a, current_b, current_c,
-          power_kw, energy_kwh,
-        },
-      ])
+      .insert([payload])
       .select()
       .single();
 
@@ -48,9 +70,13 @@ router.post('/readings', async (req, res) => {
     res.status(201).json(data);
   } catch (err) {
     console.error('Supabase Ingest Error:', err);
-    res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล', error: err.message });
   }
-});
+};
+
+// รองรับทั้ง POST /api/ingest และ POST /api/ingest/readings
+router.post('/', handleIngestReadings);
+router.post('/readings', handleIngestReadings);
 
 // POST /api/ingest/anomalies
 router.post('/anomalies', async (req, res) => {
@@ -61,7 +87,6 @@ router.post('/anomalies', async (req, res) => {
   }
 
   try {
-    // 3. เปลี่ยนมา insert ลง Supabase
     const { data, error } = await supabase
       .from('anomalies')
       .insert([
@@ -86,136 +111,3 @@ router.post('/anomalies', async (req, res) => {
 });
 
 module.exports = router;
-
-// routes/ingest.js
-// รับข้อมูลจาก IoT gateway / โมเดล ML แล้วบันทึกลง energy_readings
-// ต้องแนบ header: x-api-key: <IOT_API_KEY>
-
-// const express = require('express');
-// const router = express.Router();
-// const pool = require('../scripts/db');
-
-// const NUMERIC_FIELDS = [
-//   'voltage_a', 'voltage_b', 'voltage_c',
-//   'current_a', 'current_b', 'current_c',
-//   'power_kw', 'energy_kwh',
-// ];
-
-// function checkApiKey(req, res, next) {
-//   const apiKey = req.header('x-api-key');
-//   if (!apiKey || apiKey !== process.env.INGEST_API_KEY) {
-//     return res.status(401).json({ status: 'error', message: 'Invalid or missing API key' });
-//   }
-//   next();
-// }
-
-// function validateReading(payload) {
-//   const errors = [];
-
-//   if (!payload.device_id || !Number.isInteger(Number(payload.device_id))) {
-//     errors.push('device_id is required and must be an integer');
-//   }
-
-//   for (const field of NUMERIC_FIELDS) {
-//     if (payload[field] !== undefined && payload[field] !== null && isNaN(Number(payload[field]))) {
-//       errors.push(`${field} must be a number`);
-//     }
-//   }
-
-//   if (payload.reading_time && isNaN(Date.parse(payload.reading_time))) {
-//     errors.push('reading_time must be a valid ISO date string');
-//   }
-
-//   return errors;
-// }
-
-// async function insertOneReading(client, payload) {
-//   const query = `
-//     INSERT INTO energy_readings
-//       (device_id, reading_time, voltage_a, voltage_b, voltage_c,
-//        current_a, current_b, current_c, power_kw, energy_kwh)
-//     VALUES ($1, COALESCE($2, NOW()), $3, $4, $5, $6, $7, $8, $9, $10)
-//     RETURNING id, device_id, reading_time
-//   `;
-//   const values = [
-//     payload.device_id,
-//     payload.reading_time || null,
-//     payload.voltage_a ?? null,
-//     payload.voltage_b ?? null,
-//     payload.voltage_c ?? null,
-//     payload.current_a ?? null,
-//     payload.current_b ?? null,
-//     payload.current_c ?? null,
-//     payload.power_kw ?? null,
-//     payload.energy_kwh ?? null,
-//   ];
-//   const { rows } = await client.query(query, values);
-//   return rows[0];
-// }
-
-// // POST /api/ingest/readings
-// // body: { device_id, voltage_a, ... }  หรือ array ของ object เดียวกัน (batch)
-// router.post('/readings', checkApiKey, async (req, res) => {
-//   const body = req.body;
-//   const isBatch = Array.isArray(body);
-//   const readings = isBatch ? body : [body];
-
-//   if (readings.length === 0) {
-//     return res.status(400).json({ status: 'error', message: 'Empty payload' });
-//   }
-//   if (readings.length > 500) {
-//     return res.status(400).json({ status: 'error', message: 'Too many readings in one batch (max 500)' });
-//   }
-
-//   const allErrors = [];
-//   readings.forEach((r, idx) => {
-//     const errs = validateReading(r);
-//     if (errs.length) allErrors.push({ index: idx, errors: errs });
-//   });
-//   if (allErrors.length) {
-//     return res.status(400).json({ status: 'error', message: 'Validation failed', details: allErrors });
-//   }
-
-//   const client = await pool.connect();
-//   try {
-//     await client.query('BEGIN');
-
-//     // กันข้อมูลผีจาก device_id ที่ไม่มีในระบบ
-//     const deviceIds = [...new Set(readings.map((r) => Number(r.device_id)))];
-//     const { rows: existingDevices } = await client.query(
-//       'SELECT id FROM devices WHERE id = ANY($1::int[])',
-//       [deviceIds]
-//     );
-//     const existingIds = new Set(existingDevices.map((d) => d.id));
-//     const unknownIds = deviceIds.filter((id) => !existingIds.has(id));
-//     if (unknownIds.length) {
-//       await client.query('ROLLBACK');
-//       return res.status(400).json({
-//         status: 'error',
-//         message: 'Unknown device_id(s)',
-//         unknown_device_ids: unknownIds,
-//       });
-//     }
-
-//     const inserted = [];
-//     for (const reading of readings) {
-//       const row = await insertOneReading(client, reading);
-//       inserted.push(row);
-//     }
-
-//     await client.query('COMMIT');
-//     return res.status(201).json({
-//       status: 'success',
-//       message: `Inserted ${inserted.length} reading(s)`,
-//       data: inserted,
-//     });
-//   } catch (err) {
-//     await client.query('ROLLBACK');
-//     console.error('Ingest energy_readings error:', err);
-//     return res.status(500).json({ status: 'error', message: 'Internal server error' });
-//   } finally {
-//     client.release();
-//   }
-// });
-
-// module.exports = router;

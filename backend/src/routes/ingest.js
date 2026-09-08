@@ -25,12 +25,12 @@ const handleIngestReadings = async (req, res) => {
     return res.status(400).json({ message: 'กรุณาระบุ device_id' });
   }
 
-  const getThailandTime = () => {
-    const now = new Date();
-    const thaiTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
-    return thaiTime.toISOString().replace('Z', '+07:00');
-  };
-
+ const getThaiTime = () => {
+  const now = new Date();
+  // บวกเพิ่ม 7 ชั่วโมง
+  const thaiDate = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+  return thaiDate.toISOString().replace('Z', '');
+};
   // แปลงค่าจาก ESP32 ให้ลงคอลัมน์ Supabase ถูกต้อง (แก้ปัญหา NULL)
   const payload = {
     device_id,

@@ -68,20 +68,25 @@ function LocationPicker({
 }
 
 // เลื่อน/ซูมแผนที่ไปหาตำแหน่งอาคารอัตโนมัติ หลังโหลดข้อมูลเสร็จ (ทำครั้งเดียวตอนข้อมูลมาถึง)
-// - อาคารเดียว: ซูมเข้าไปตรงจุดนั้น
-// - หลายอาคาร: fitBounds ให้เห็นหมุดทั้งหมดพอดีจอ
 function MapAutoFit({ buildings }: { buildings: Building[] }) {
   const map = useMap();
   const [hasFitted, setHasFitted] = useState(false);
 
   useEffect(() => {
-    if (buildings.length === 0 || hasFitted) return;
+    if (!buildings || buildings.length === 0 || hasFitted) return;
 
-    if (buildings.length === 1) {
-      map.setView([buildings[0].lat, buildings[0].lng], 17);
+    // ✅ กรองเฉพาะอาคารที่ไม่เป็น null/undefined และมีพิกัด lat, lng ที่ถูกต้อง
+    const validBuildings = buildings.filter(
+      (b) => b && b.lat != null && b.lng != null && !isNaN(Number(b.lat)) && !isNaN(Number(b.lng))
+    );
+
+    if (validBuildings.length === 0) return;
+
+    if (validBuildings.length === 1) {
+      map.setView([Number(validBuildings[0].lat), Number(validBuildings[0].lng)], 17);
     } else {
       const bounds = L.latLngBounds(
-        buildings.map((b) => [b.lat, b.lng] as [number, number])
+        validBuildings.map((b) => [Number(b.lat), Number(b.lng)] as [number, number])
       );
       map.fitBounds(bounds, { padding: [60, 60] });
     }
@@ -137,7 +142,7 @@ export default function AdminMapView() {
       }
       if (!res.ok) throw new Error("โหลดข้อมูลอาคารไม่สำเร็จ");
       const data: Building[] = await res.json();
-      setBuildings(data);
+      setBuildings(data || []);
     } catch (err) {
       console.error(err);
       setError("เกิดข้อผิดพลาดในการโหลดข้อมูล");
@@ -190,11 +195,12 @@ export default function AdminMapView() {
     setError(null);
   };
 
-  // ใหม่: คลิกหมุด -> ไปหน้าแสดงข้อมูลอาคาร
+  // คลิกหมุด -> ไปหน้าแสดงข้อมูลอาคาร
   const handleMarkerClick = (b: Building) => {
     router.push(`/admin/buildings/${b.id}`);
   };
-  // คลิกบนแผนที่ตอนเปิดแผงจัดการ = เติม lat/lng ให้ฟอร์มอัตโนมัติ (ใช้ได้ทั้งตอนเพิ่มใหม่และแก้ไข)
+
+  // คลิกบนแผนที่ตอนเปิดแผงจัดการ = เติม lat/lng ให้ฟอร์มอัตโนมัติ
   const handlePickLocation = (lat: number, lng: number) => {
     setForm((f) => ({ ...f, lat: String(lat), lng: String(lng) }));
   };
@@ -212,7 +218,7 @@ export default function AdminMapView() {
 
     if (!res.ok) throw new Error("อัปโหลดรูปไม่สำเร็จ");
     const data = await res.json();
-    return data.url; // สมมติ API คืน { url: "https://..." }
+    return data.url;
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -239,7 +245,7 @@ export default function AdminMapView() {
       let imageUrl = form.image_url;
 
       if (imageFile) {
-        imageUrl = await uploadBuildingImage(imageFile); // อัปโหลดรูปก่อน ได้ URL กลับมา
+        imageUrl = await uploadBuildingImage(imageFile);
       }
 
       const isEditingNow = editingId !== null;
@@ -358,7 +364,7 @@ export default function AdminMapView() {
         </div>
       </div>
 
-      {/* ตัวแสดงผลแผนที่ Leaflet — ใช้ข้อมูลจาก API เดียวกับแผงจัดการ */}
+      {/* ตัวแสดงผลแผนที่ Leaflet */}
       <MapContainer
         center={DEFAULT_CENTER}
         zoom={13}
@@ -373,44 +379,47 @@ export default function AdminMapView() {
         {/* คลิกบนแผนที่ตอนแผงจัดการเปิดอยู่ = เซ็ต lat/lng ให้ฟอร์มอัตโนมัติ */}
         <LocationPicker active={panelOpen} onPick={handlePickLocation} />
 
-        {/* พอโหลดอาคารเสร็จ ให้เลื่อน/ซูมแผนที่ไปหาตำแหน่งอาคารอัตโนมัติ แก้ปัญหาเปิดมาแล้วเห็นแต่กรุงเทพ */}
+        {/* ปรับตำแหน่งแผนที่อัตโนมัติ */}
         <MapAutoFit buildings={buildings} />
 
-        {buildings.map((building) => (
-          <Marker
-            key={building.id}
-            position={[building.lat, building.lng]}
-            icon={markerIcon}
-            eventHandlers={{
-              click: () => handleMarkerClick(building),
-            }}
-          >
-            <Tooltip
-              direction="top"
-              offset={[0, -35]}
-              opacity={1}
-              permanent
-              className="!bg-white !border-none !shadow-lg !rounded-lg"
+        {/* ✅ วาด Marker เฉพาะอาคารที่มีข้อมูลครบสมบูรณ์เท่านั้น */}
+        {buildings
+          .filter((b) => b && b.lat != null && b.lng != null)
+          .map((building) => (
+            <Marker
+              key={building.id}
+              position={[Number(building.lat), Number(building.lng)]}
+              icon={markerIcon}
+              eventHandlers={{
+                click: () => handleMarkerClick(building),
+              }}
             >
-              <div className="text-sm min-w-[140px] p-1">
-                <p className="font-semibold text-gray-800">{building.name}</p>
-                {building.status && (
-                  <span
-                    className="inline-block text-[11px] font-bold px-2 py-0.5 rounded text-white mt-1"
-                    style={{
-                      backgroundColor:
-                        statusColorMap[building.status] || "#6b7280",
-                    }}
-                  >
-                    {building.status}
-                  </span>
-                )}
-              </div>
-            </Tooltip>
-          </Marker>
-        ))}
+              <Tooltip
+                direction="top"
+                offset={[0, -35]}
+                opacity={1}
+                permanent
+                className="!bg-white !border-none !shadow-lg !rounded-lg"
+              >
+                <div className="text-sm min-w-[140px] p-1">
+                  <p className="font-semibold text-gray-800">{building.name}</p>
+                  {building.status && (
+                    <span
+                      className="inline-block text-[11px] font-bold px-2 py-0.5 rounded text-white mt-1"
+                      style={{
+                        backgroundColor:
+                          statusColorMap[building.status] || "#6b7280",
+                      }}
+                    >
+                      {building.status}
+                    </span>
+                  )}
+                </div>
+              </Tooltip>
+            </Marker>
+          ))}
 
-        {/* หมุดร่าง — แสดงตำแหน่งที่กำลังจะบันทึก (เพิ่มใหม่ หรือกำลังแก้ไข) ก่อนกดยืนยัน */}
+        {/* หมุดร่าง — แสดงตำแหน่งที่กำลังจะบันทึก */}
         {hasDraftLocation && (
           <Marker
             position={[Number(form.lat), Number(form.lng)]}
@@ -426,14 +435,16 @@ export default function AdminMapView() {
       {/* Overlay มืดด้านหลัง เมื่อเปิด Drawer */}
       <div
         onClick={() => setPanelOpen(false)}
-        className={`absolute inset-0 bg-black/30 transition-opacity duration-300 z-[1400] ${panelOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-          }`}
+        className={`absolute inset-0 bg-black/30 transition-opacity duration-300 z-[1400] ${
+          panelOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
       />
 
       {/* Drawer จัดการอาคาร เลื่อนออกจากขวา */}
       <div
-        className={`absolute top-0 right-0 h-full w-full sm:w-[440px] bg-white shadow-2xl z-[1500] flex flex-col transition-transform duration-300 ease-out ${panelOpen ? "translate-x-0" : "translate-x-full"
-          }`}
+        className={`absolute top-0 right-0 h-full w-full sm:w-[440px] bg-white shadow-2xl z-[1500] flex flex-col transition-transform duration-300 ease-out ${
+          panelOpen ? "translate-x-0" : "translate-x-full"
+        }`}
       >
         {/* หัวแผง */}
         <div
@@ -584,38 +595,41 @@ export default function AdminMapView() {
             <p className="text-sm text-gray-500">ยังไม่มีข้อมูลอาคาร</p>
           ) : (
             <ul className="flex flex-col gap-2">
-              {buildings.map((b) => (
-                <li
-                  key={b.id}
-                  className={`flex items-center justify-between border rounded-lg px-3 py-2.5 ${editingId === b.id ? "bg-blue-50 border-blue-200" : "bg-white"
+              {buildings
+                .filter((b) => b != null)
+                .map((b) => (
+                  <li
+                    key={b.id}
+                    className={`flex items-center justify-between border rounded-lg px-3 py-2.5 ${
+                      editingId === b.id ? "bg-blue-50 border-blue-200" : "bg-white"
                     }`}
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">
-                      {b.name}
-                    </p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {b.location || "-"} · {b.lat}, {b.lng}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0 ml-2">
-                    <button
-                      onClick={() => handleStartEdit(b)}
-                      className="p-1.5 rounded hover:bg-blue-50 text-blue-600"
-                      aria-label={`แก้ไข ${b.name}`}
-                    >
-                      <Pencil size={15} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(b.id)}
-                      className="p-1.5 rounded hover:bg-red-50 text-red-600"
-                      aria-label={`ลบ ${b.name}`}
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                </li>
-              ))}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">
+                        {b.name}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {b.location || "-"} · {b.lat}, {b.lng}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0 ml-2">
+                      <button
+                        onClick={() => handleStartEdit(b)}
+                        className="p-1.5 rounded hover:bg-blue-50 text-blue-600"
+                        aria-label={`แก้ไข ${b.name}`}
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(b.id)}
+                        className="p-1.5 rounded hover:bg-red-50 text-red-600"
+                        aria-label={`ลบ ${b.name}`}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </li>
+                ))}
             </ul>
           )}
         </div>
@@ -623,4 +637,3 @@ export default function AdminMapView() {
     </div>
   );
 }
-

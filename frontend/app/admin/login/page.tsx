@@ -53,7 +53,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
     }
 
     // เปลี่ยนหน้าไปยัง Dashboard หลัง Login สำเร็จ
-    router.push("/components/admin");
+    router.push("/admin");
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {

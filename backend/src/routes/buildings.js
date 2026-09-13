@@ -1,47 +1,3 @@
-// const express = require('express');
-// const pool = require('../scripts/db');
-// const router = express.Router();
-
-// // GET /api/buildings?search=xxx
-// router.get('/', async (req, res) => {
-//   const { search } = req.query;
-
-//   try {
-//     let query = 'SELECT * FROM buildings';
-//     const values = [];
-
-//     if (search) {
-//       query += ' WHERE name ILIKE $1 OR location ILIKE $1';
-//       values.push(`%${search}%`);
-//     }
-
-//     query += ' ORDER BY name ASC';
-
-//     const result = await pool.query(query, values);
-//     res.json(result.rows);
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
-//   }
-// });
-
-// // GET /api/buildings/:id
-// router.get('/:id', async (req, res) => {
-//   try {
-//     const result = await pool.query('SELECT * FROM buildings WHERE id = $1', [req.params.id]);
-//     if (result.rows.length === 0) {
-//       return res.status(404).json({ message: 'ไม่พบอาคารนี้' });
-//     }
-//     res.json(result.rows[0]);
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
-//   }
-// });
-
-// module.exports = router;
-
-
 const express = require('express');
 const supabase = require('../supabase');
 const router = express.Router();
@@ -87,3 +43,39 @@ router.get('/:id', async (req, res) => {
 });
 
 module.exports = router;
+
+
+
+// const express = require('express');
+// const supabase = require('../supabase');
+// const authenticateAdmin = require('../middleware/auth');
+
+// const router = express.Router();
+
+// router.use(authenticateAdmin); // ทุก route ในไฟล์นี้ต้อง login ก่อน
+
+// // GET /api/admin/buildings/:id/ingest
+// router.get('/:id/ingest', async (req, res) => {
+//   const buildingId = Number(req.params.id);
+//   if (!buildingId) {
+//     return res.status(400).json({ message: 'building id ไม่ถูกต้อง' });
+//   }
+
+//   try {
+//     const { data, error } = await supabase
+//       .from('energy_ingest')
+//       .select('*')
+//       .eq('building_id', buildingId)
+//       .order('created_at', { ascending: false })
+//       .limit(30);
+
+//     if (error) throw error;
+
+//     res.json({ data: data.reverse() });
+//   } catch (err) {
+//     console.error('Fetch ingest error:', err);
+//     res.status(500).json({ message: 'ดึงข้อมูลไม่สำเร็จ', error: err.message });
+//   }
+// });
+
+// module.exports = router;

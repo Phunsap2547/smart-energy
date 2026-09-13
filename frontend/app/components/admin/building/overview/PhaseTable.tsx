@@ -1,76 +1,94 @@
 "use client";
 
 import React from "react";
-import { EnergyIngest } from "../../../../types/energy";
+import { EnergyIngest } from "@/types/energy";
+import { formatNumber } from "@/lib/formatter";
 
 interface PhaseTableProps {
   latestData: EnergyIngest | null;
 }
 
 export default function PhaseTable({ latestData }: PhaseTableProps) {
-  if (!latestData) {
-    return (
-      <div className="bg-white p-5 rounded-xl border shadow-sm text-center text-gray-400 text-sm">
-        กำลังโหลดข้อมูล Phase...
-      </div>
-    );
-  }
-
-  const avgVoltage = (
-    (latestData.voltage_l1 + latestData.voltage_l2 + latestData.voltage_l3) /
-    3
-  ).toFixed(1);
-
-  const totalCurrent = (
-    latestData.current_l1 +
-    latestData.current_l2 +
-    latestData.current_l3
-  ).toFixed(1);
+  const phases = [
+    {
+      phase: "L1",
+      voltage: latestData?.voltage_a ?? 0,
+      current: latestData?.current_a ?? 0,
+      pf: latestData?.power_factor ?? 0,
+      thd: latestData?.thd_voltage_l1_pct ?? 0,
+      isError: false,
+    },
+    {
+      phase: "L2",
+      voltage: latestData?.voltage_b ?? 0,
+      current: latestData?.current_b ?? 0,
+      pf: latestData?.power_factor ?? 0,
+      thd: latestData?.thd_voltage_l1_pct ?? 0,
+      isError: false,
+    },
+    {
+      phase: "L3",
+      voltage: latestData?.voltage_c ?? 0,
+      current: latestData?.current_c ?? 0,
+      pf: latestData?.power_factor ?? 0,
+      thd: latestData?.thd_voltage_l1_pct ?? 0,
+      isError: false,
+      // isError: (latestData?.voltage_c ?? 0) === 0 || (latestData?.power_factor ?? 1) < 0.5,
+    },
+  ];
 
   return (
-    <div className="bg-white p-5 rounded-xl border shadow-sm">
-      <div className="mb-4">
-        <h3 className="text-base font-bold text-gray-800">3-Phase Status</h3>
-        <p className="text-xs text-gray-500">สถานะไฟฟ้าแยกเฟส L1, L2, L3 ล่าสุด</p>
+    <div className="space-y-3">
+      <div className="flex justify-between items-center">
+        <h2 className="text-base font-semibold text-gray-800">
+          รายเฟส — เปรียบเทียบความสมดุลของโหลด
+        </h2>
+        <button className="text-xs font-medium text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition">
+          📈 ดูรายเฟสแบบกราฟ
+        </button>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
+        <table className="w-full text-sm text-left border-collapse">
           <thead>
-            <tr className="border-b bg-gray-50 text-gray-600 text-xs uppercase font-semibold">
-              <th className="py-2.5 px-3">เฟส (Phase)</th>
-              <th className="py-2.5 px-3">แรงดัน (Voltage - V)</th>
-              <th className="py-2.5 px-3">กระแส (Current - A)</th>
-              <th className="py-2.5 px-3">Power Factor (PF)</th>
+            <tr className="border-b border-gray-100 text-gray-500 font-medium text-xs">
+              <th className="py-2.5 px-3">เฟส</th>
+              <th className="py-2.5 px-3">แรงดัน (V)</th>
+              <th className="py-2.5 px-3">กระแส (A)</th>
+              <th className="py-2.5 px-3">PF</th>
+              <th className="py-2.5 px-3">THD-I (%)</th>
+              <th className="py-2.5 px-3 text-center">สถานะ</th>
             </tr>
           </thead>
-          <tbody className="divide-y text-gray-700">
-            <tr>
-              <td className="py-2.5 px-3 font-semibold text-blue-600">Phase L1</td>
-              <td className="py-2.5 px-3">{latestData.voltage_l1?.toFixed(1) ?? "-"} V</td>
-              <td className="py-2.5 px-3">{latestData.current_l1?.toFixed(2) ?? "-"} A</td>
-              <td className="py-2.5 px-3">{latestData.pf_l1?.toFixed(2) ?? "-"}</td>
-            </tr>
-            <tr>
-              <td className="py-2.5 px-3 font-semibold text-amber-600">Phase L2</td>
-              <td className="py-2.5 px-3">{latestData.voltage_l2?.toFixed(1) ?? "-"} V</td>
-              <td className="py-2.5 px-3">{latestData.current_l2?.toFixed(2) ?? "-"} A</td>
-              <td className="py-2.5 px-3">{latestData.pf_l2?.toFixed(2) ?? "-"}</td>
-            </tr>
-            <tr>
-              <td className="py-2.5 px-3 font-semibold text-emerald-600">Phase L3</td>
-              <td className="py-2.5 px-3">{latestData.voltage_l3?.toFixed(1) ?? "-"} V</td>
-              <td className="py-2.5 px-3">{latestData.current_l3?.toFixed(2) ?? "-"} A</td>
-              <td className="py-2.5 px-3">{latestData.pf_l3?.toFixed(2) ?? "-"}</td>
-            </tr>
-            <tr className="bg-gray-50 font-semibold text-gray-900 border-t">
-              <td className="py-2.5 px-3">รวม / เฉลี่ย</td>
-              <td className="py-2.5 px-3 text-gray-600">{avgVoltage} V (เฉลี่ย)</td>
-              <td className="py-2.5 px-3 text-gray-600">{totalCurrent} A (รวม)</td>
-              <td className="py-2.5 px-3 text-gray-600">
-                {latestData.total_pf?.toFixed(2) ?? "-"}
-              </td>
-            </tr>
+          <tbody className="divide-y divide-gray-50 font-medium">
+            {phases.map((p) => (
+              <tr
+                key={p.phase}
+                className={p.isError ? "bg-red-50/50 text-red-600" : "text-gray-700"}
+              >
+                <td className="py-3 px-3 font-semibold">{p.phase}</td>
+                <td className="py-3 px-3">{formatNumber(p.voltage, 0)} V</td>
+                <td className="py-3 px-3">{formatNumber(p.current, 1)} A</td>
+                <td className="py-3 px-3">{formatNumber(p.pf, 2)}</td>
+                <td className="py-3 px-3">{formatNumber(p.thd, 0)} %</td>
+                <td className="py-3 px-3 text-center">
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                      p.isError
+                        ? "bg-red-100 text-red-700"
+                        : "bg-emerald-100 text-emerald-700"
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        p.isError ? "bg-red-500" : "bg-emerald-500"
+                      }`}
+                    />
+                    {p.isError ? "ผิดปกติ" : "ปกติ"}
+                  </span>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

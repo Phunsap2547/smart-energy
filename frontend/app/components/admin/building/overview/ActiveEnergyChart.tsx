@@ -10,7 +10,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { EnergyIngest } from "../../../../types/energy";
+import { EnergyIngest } from "@/types/energy";
 import { formatNumber } from "@/lib/formatter";
 
 interface ActiveEnergyChartProps {
@@ -18,77 +18,93 @@ interface ActiveEnergyChartProps {
 }
 
 export default function ActiveEnergyChart({ data }: ActiveEnergyChartProps) {
-  // แปลง ISO Timestamp ให้แสดงเวลาสั้นๆ เช่น 14:30
-  const chartData = data.map((item) => ({
-    time: new Date(item.created_at).toLocaleTimeString("th-TH", {
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-48 flex items-center justify-center text-gray-400 text-sm">
+        ไม่มีข้อมูลสำหรับแสดงกราฟ
+      </div>
+    );
+  }
+
+  const chartData = data.map((item) => {
+    const rawDate = item.reading_time || item.created_at;
+    const date = rawDate ? new Date(rawDate) : new Date();
+    const timeLabel = date.toLocaleTimeString("th-TH", {
       hour: "2-digit",
       minute: "2-digit",
-    }),
-    power: item.active_power,
-    energy: item.active_energy,
-  }));
+      hour12: false,
+    });
+
+    const energyValue = item.energy_kwh ?? item.power_kw ?? 0;
+
+    return {
+      time: timeLabel,       
+      energy: Number(energyValue),
+    };
+  });
 
   return (
-    <div className="bg-white p-5 rounded-xl border shadow-sm w-full">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-base font-bold text-gray-800">
-            Active Power & Energy Trend
-          </h3>
-          <p className="text-xs text-gray-500">
-            แนวโน้มการใช้งานกำลังไฟฟ้าในช่วงเวลาที่ผ่านมา
-          </p>
-        </div>
-      </div>
+    <div className="h-48 w-full pt-2">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart
+          data={chartData}
+          margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+        >
+          <defs>
+            <linearGradient id="energyGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+            </linearGradient>
+          </defs>
 
-      <div className="h-[280px] w-full">
-        {chartData.length === 0 ? (
-          <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-            ไม่มีข้อมูลสำหรับแสดงกราฟ
-          </div>
-        ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={chartData}
-              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-            >
-              <defs>
-                <linearGradient id="powerGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                vertical={false}
-                stroke="#f1f5f9"
-              />
-              <XAxis dataKey="time" tick={{ fontSize: 11, fill: "#64748b" }} />
-              <YAxis tick={{ fontSize: 11, fill: "#64748b" }} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#ffffff",
-                  borderRadius: "8px",
-                  border: "1px solid #e2e8f0",
-                  fontSize: "12px",
-                }}
-                formatter={(val) => [
-                  `${formatNumber(Number(val ?? 0), 2)} kW`,
-                  "Active Power",
-                ]}
-              />
-              <Area
-                type="monotone"
-                dataKey="power"
-                stroke="#3b82f6"
-                strokeWidth={2}
-                fillOpacity={1}
-                fill="url(#powerGradient)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        )}
-      </div>
+          <CartesianGrid
+            strokeDasharray="3 3"
+            vertical={false}
+            stroke="#f1f5f9"
+          />
+
+          <XAxis
+            dataKey="time"
+            tickLine={false}
+            axisLine={false}
+            tick={{ fontSize: 11, fill: "#9ca3af" }}
+            interval="preserveStartEnd"
+          />
+
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            tick={{ fontSize: 11, fill: "#9ca3af" }}
+          />
+
+          <Tooltip
+            content={({ active, payload }) => {
+              if (active && payload && payload.length) {
+                return (
+                  <div className="bg-gray-900 text-white p-2 rounded-lg shadow-md text-xs">
+                    <p className="font-medium text-gray-300">
+                      {payload[0].payload.time}
+                    </p>
+                    <p className="text-emerald-400 font-semibold mt-0.5">
+                      Energy: {formatNumber(Number(payload[0].value ?? 0), 1)} kWh
+                    </p>
+                  </div>
+                );
+              }
+              return null;
+            }}
+          />
+
+          <Area
+            type="monotone"
+            dataKey="energy"
+            stroke="#10b981"
+            strokeWidth={2}
+            fillOpacity={1}
+            fill="url(#energyGradient)"
+          />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }

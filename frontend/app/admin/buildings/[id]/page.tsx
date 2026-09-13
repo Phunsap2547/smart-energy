@@ -2,13 +2,28 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import {
+  AlertTriangle,
+  Zap,
+  Activity,
+  Gauge,
+  Radio,
+  ChevronRight,
+  TrendingUp,
+} from "lucide-react";
+
 import OverviewCard from "@/components/admin/building/overview/OverviewCard";
 import ActiveEnergyChart from "@/components/admin/building/overview/ActiveEnergyChart";
 import PhaseTable from "@/components/admin/building/overview/PhaseTable";
-import { Zap, Activity, Gauge, BatteryCharging } from "lucide-react";
+import THDChart from "@/components/admin/building/overview/THDChart";
+
+// import BuildingHeader from "@/components/admin/building/shared/BuildingHeader";
+import BuildingSidebar from "@/components/admin/building/shared/BuildingSidebar";
+import RealtimeClock from "@/components/admin/building/shared/RealtimeClock";
 
 import { supabase } from "@/lib/supabase";
+import { EnergyIngest } from "@/types/energy";
+import { formatNumber } from "@/lib/formatter";
 
 export default function BuildingOverviewPage() {
   const params = useParams();
@@ -17,46 +32,71 @@ export default function BuildingOverviewPage() {
   const [ingestData, setIngestData] = useState<EnergyIngest[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ดึงข้อมูลกรองตาม building_id
+  const [energyFilter, setEnergyFilter] = useState<"1D" | "7D" | "30D" | "12M">("7D");
+  const [thdFilter, setThdFilter] = useState<"1D" | "7D" | "30D">("1D");
+
   const fetchIngestData = useCallback(async () => {
     if (!buildingId) return;
 
     try {
-      const { data, error } = await supabase
-        .from("energy_ingest")
-        .select("*")
-        .eq("building_id", buildingId)
-        .order("created_at", { ascending: false })
-        .limit(30);
+      // 1. ดึง device_id ทั้งหมดของอาคารนี้
+      const { data: devices, error: deviceError } = await supabase
+        .from("devices")
+        .select("id")
+        .eq("building_id", buildingId);
 
-      if (error) {
-        console.error("Supabase error:", error);
+      if (deviceError) {
+        console.error("Device fetch error:", deviceError);
         return;
       }
 
-      if (data) {
-        setIngestData([...data].reverse());
+      const deviceIds = devices?.map((d) => d.id) || [];
+      if (deviceIds.length === 0) {
+        setIngestData([]);
+        return;
       }
+
+      // 2. คำนวณวันที่เริ่มต้นย้อนหลัง
+      const now = new Date();
+      let startDate = new Date();
+      if (energyFilter === "1D") startDate.setDate(now.getDate() - 1);
+      else if (energyFilter === "7D") startDate.setDate(now.getDate() - 7);
+      else if (energyFilter === "30D") startDate.setDate(now.getDate() - 30);
+      else if (energyFilter === "12M") startDate.setFullYear(now.getFullYear() - 1);
+
+      // 3. Query ข้อมูลย้อนหลังตามช่วงเวลาที่กรอง
+      const { data, error } = await supabase
+        .from("energy_readings")
+        .select("*")
+        .in("device_id", deviceIds)
+        .gte("reading_time", startDate.toISOString())
+        .order("reading_time", { ascending: true });
+
+      if (error) {
+        console.error("Supabase Error Details:", error);
+        return;
+      }
+
+      if (data) setIngestData(data);
     } catch (err) {
-      console.error(err);
+      console.error("Fetch error:", err);
     } finally {
       setLoading(false);
     }
-  }, [buildingId]);
+  }, [buildingId, energyFilter]);
 
+  // Realtime & Initial Data Fetching
   useEffect(() => {
     fetchIngestData();
 
-    // ฟัง Realtime Data เฉพาะ building_id นี้
     const channel = supabase
-      .channel(`energy_ingest_b${buildingId}`)
+      .channel(`energy_readings_b${buildingId}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
-          table: "energy_ingest",
-          filter: `building_id=eq.${buildingId}`,
+          table: "energy_readings",
         },
         () => fetchIngestData()
       )
@@ -69,79 +109,192 @@ export default function BuildingOverviewPage() {
 
   const latest = ingestData[ingestData.length - 1] || null;
 
+  // -------------------------------------------------------------
+  // เงื่อนไขตรวจสอบสถานะผิดปกติ (Threshold Checking)
+  // -------------------------------------------------------------
+  const voltage = latest?.voltage_system ?? 0;
+  const current = latest?.current_system ?? 0;
+  const pf = latest?.power_factor ?? 1;
+  const freq = latest?.frequency_hz ?? 50;
+
+  const isVoltageAnomaly = latest ? (voltage < 380 || voltage > 440) : false;
+  const isCurrentAnomaly = latest ? (current >= 100) : false;
+  const isPfAnomaly = latest ? (pf < 0.80) : false;
+  const isFreqAnomaly = latest ? (freq < 49 || freq > 51) : false;
+
+  const hasAnyAnomaly = isVoltageAnomaly || isCurrentAnomaly || isPfAnomaly || isFreqAnomaly;
+
   if (loading) {
     return (
-      <div className="p-8 text-center text-gray-500 font-medium">
-        กำลังโหลดข้อมูลอาคาร ID: {buildingId}...
+      <div className="flex h-64 items-center justify-center text-gray-500 font-medium">
+        กำลังโหลดข้อมูลระบบ...
       </div>
     );
   }
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen space-y-6">
-      {/* Dynamic Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            ภาพรวมพลังงาน (Building ID: {buildingId})
-          </h1>
-          <p className="text-xs text-gray-500">
-            อัปเดตล่าสุด:{" "}
-            {latest
-              ? new Date(latest.created_at).toLocaleString("th-TH")
-              : "ไม่มีข้อมูล Realtime"}
-          </p>
-        </div>
-      </div>
+    <div className="flex min-h-screen bg-gray-50">
+      {/* Sidebar */}
+      <BuildingSidebar buildingId={buildingId} />
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <OverviewCard
-          title="Active Power"
-          value={latest?.active_power?.toFixed(2) ?? "0.00"}
-          unit="kW"
-          borderColor="#3b82f6"
-          icon={<Zap size={20} className="text-blue-500" />}
-          subtitle="กำลังไฟฟ้าปัจจุบัน"
-        />
-        <OverviewCard
-          title="Active Energy"
-          value={latest?.active_energy?.toFixed(1) ?? "0.0"}
-          unit="kWh"
-          borderColor="#10b981"
-          icon={<BatteryCharging size={20} className="text-emerald-500" />}
-          subtitle="พลังงานไฟฟ้ารวม"
-        />
-        <OverviewCard
-          title="Power Factor"
-          value={latest?.total_pf?.toFixed(2) ?? "0.00"}
-          borderColor="#f59e0b"
-          icon={<Gauge size={20} className="text-amber-500" />}
-          subtitle={
-            (latest?.total_pf ?? 0) >= 0.85 ? "สถานะปกติ (≥ 0.85)" : "ควรปรับปรุง"
-          }
-        />
-        <OverviewCard
-          title="Total Current"
-          value={(
-            (latest?.current_l1 ?? 0) +
-            (latest?.current_l2 ?? 0) +
-            (latest?.current_l3 ?? 0)
-          ).toFixed(1)}
-          unit="A"
-          borderColor="#8b5cf6"
-          icon={<Activity size={20} className="text-purple-500" />}
-          subtitle="กระแสไฟฟ้ารวม 3 เฟส"
-        />
-      </div>
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Header Nav */}
+        {/* <BuildingHeader buildingId={buildingId} /> */}
 
-      {/* Chart & Table */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <ActiveEnergyChart data={ingestData} />
-        </div>
-        <div className="lg:col-span-1">
-          <PhaseTable latestData={latest} />
+        {/* Main Content Area */}
+        <div className="p-6 space-y-6">
+          {/* Header & Realtime Clock */}
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">ภาพรวมระบบ</h1>
+              <p className="text-sm text-gray-500">สรุปสถานะระบบไฟฟ้าแบบ Real-time</p>
+            </div>
+            <RealtimeClock />
+          </div>
+
+          {/* Warning Banner */}
+          {hasAnyAnomaly && (
+            <div className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-xl text-red-900">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="text-red-600 shrink-0" size={20} />
+                <span className="font-medium text-sm">
+                  พบค่าความผิดปกติในระบบไฟฟ้า —{" "}
+                  {isPfAnomaly && `Power factor รวมต่ำ (${formatNumber(pf, 2)}) `}
+                  {isVoltageAnomaly && `แรงดันไม่อยู่ในช่วง 380-440V (${formatNumber(voltage, 1)}V) `}
+                  {isCurrentAnomaly && `กระแสเกินเกณฑ์ (${formatNumber(current, 1)}A) `}
+                  {isFreqAnomaly && `ความถี่ไม่อยู่ในช่วง 49-51Hz (${formatNumber(freq, 1)}Hz) `}
+                  — ควรตรวจสอบโหลด
+                </span>
+              </div>
+              <button className="flex items-center gap-1 text-sm font-medium text-red-700 hover:text-red-800 transition">
+                ดูรายละเอียดเพิ่มเติม <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+
+          {/* Top 4 Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* System Voltage */}
+            <OverviewCard
+              title="System voltage"
+              value={formatNumber(voltage, 1)}
+              unit="V"
+              subtitle="แรงดันระบบ"
+              statusLabel={isVoltageAnomaly ? "ผิดปกติ" : "ปกติ"}
+              statusRange="ช่วงปกติ 380 - 440 V"
+              isError={isVoltageAnomaly}
+              icon={<Zap size={20} className={isVoltageAnomaly ? "text-red-600" : "text-emerald-600"} />}
+            />
+
+            {/* System Current */}
+            <OverviewCard
+              title="System current"
+              value={formatNumber(current, 2)}
+              unit="A"
+              subtitle="กระแสรวม"
+              statusLabel={isCurrentAnomaly ? "ผิดปกติ" : "ปกติ"}
+              statusRange="ช่วงปกติ < 100 A"
+              isError={isCurrentAnomaly}
+              icon={<Activity size={20} className={isCurrentAnomaly ? "text-red-600" : "text-emerald-600"} />}
+            />
+
+            {/* Power Factor */}
+            <OverviewCard
+              title="Total power factor"
+              value={formatNumber(pf, 2)}
+              subtitle="เพาเวอร์แฟคเตอร์รวม"
+              statusLabel={isPfAnomaly ? "ผิดปกติ" : "ปกติ"}
+              statusRange="เกณฑ์ปกติ ≥ 0.80"
+              isError={isPfAnomaly}
+              icon={<Gauge size={20} className={isPfAnomaly ? "text-red-600" : "text-emerald-600"} />}
+            />
+
+            {/* Frequency */}
+            <OverviewCard
+              title="Frequency"
+              value={formatNumber(freq, 0)}
+              unit="Hz"
+              subtitle="ความถี่"
+              statusLabel={isFreqAnomaly ? "ผิดปกติ" : "ปกติ"}
+              statusRange="ช่วงปกติ 49 - 51 Hz"
+              isError={isFreqAnomaly}
+              icon={<Radio size={20} className={isFreqAnomaly ? "text-red-600" : "text-emerald-600"} />}
+            />
+          </div>
+
+          {/* Phase Table */}
+          <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+            <PhaseTable latestData={latest} />
+          </div>
+
+          {/* Bottom Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Active Energy */}
+            <div className="lg:col-span-2 bg-white rounded-xl p-5 border border-gray-200 shadow-sm space-y-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Active energy สะสม</p>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-2xl font-bold text-gray-900">
+                      {formatNumber(latest?.energy_kwh ?? 0, 0)}
+                    </span>
+                    <span className="text-sm text-gray-500 font-medium">kWh</span>
+                  </div>
+                  <p className="text-xs text-emerald-600 font-medium flex items-center gap-1 mt-1">
+                    <TrendingUp size={14} /> พลังงานไฟฟ้ารวม
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg text-xs font-medium text-gray-600">
+                  {(["1D", "7D", "30D", "12M"] as const).map((range) => (
+                    <button
+                      key={range}
+                      onClick={() => setEnergyFilter(range)}
+                      className={`px-3 py-1 rounded-md transition ${
+                        energyFilter === range
+                          ? "bg-white text-emerald-600 font-semibold shadow-sm"
+                          : "hover:text-gray-900"
+                      }`}
+                    >
+                      {range}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <ActiveEnergyChart data={ingestData} />
+            </div>
+
+            {/* THD Voltage */}
+            <div className="lg:col-span-1 bg-white rounded-xl p-5 border border-gray-200 shadow-sm space-y-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">THD voltage เฉลี่ย</p>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-2xl font-bold text-gray-900">
+                      {formatNumber(latest?.thd_voltage_l1_pct ?? 0, 1)}
+                    </span>
+                    <span className="text-sm text-gray-500 font-medium">%</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">ค่าความเพี้ยนแรงดันเฉลี่ย</p>
+                </div>
+                <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg text-xs font-medium text-gray-600">
+                  {(["1D", "7D", "30D"] as const).map((range) => (
+                    <button
+                      key={range}
+                      onClick={() => setThdFilter(range)}
+                      className={`px-2.5 py-1 rounded-md transition ${
+                        thdFilter === range
+                          ? "bg-white text-emerald-600 font-semibold shadow-sm"
+                          : "hover:text-gray-900"
+                      }`}
+                    >
+                      {range}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <THDChart data={ingestData} />
+            </div>
+          </div>
         </div>
       </div>
     </div>

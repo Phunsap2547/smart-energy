@@ -40,7 +40,7 @@ export default function RealtimeClock() {
       </div>
       <div className="flex items-center gap-2 text-xs text-gray-500 px-1">
         <RefreshCw size={14} className="text-gray-400 animate-spin shrink-0" />
-        <span>อัปเดตอัตโนมัติทุก 2 นาที</span>
+        <span>อัปเดตอัตโนมัติทุก 1 นาที</span>
       </div>
     </div>
   );

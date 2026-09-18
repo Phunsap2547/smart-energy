@@ -3,12 +3,16 @@
 import React from "react";
 import { EnergyIngest } from "@/types/energy";
 import { formatNumber } from "@/lib/formatter";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 
 interface PhaseTableProps {
   latestData: EnergyIngest | null;
 }
 
 export default function PhaseTable({ latestData }: PhaseTableProps) {
+  const params = useParams();
+  const buildingId = params?.id;
   const phases = [
     {
       phase: "L1",
@@ -43,9 +47,12 @@ export default function PhaseTable({ latestData }: PhaseTableProps) {
         <h2 className="text-base font-semibold text-gray-800">
           รายเฟส — เปรียบเทียบความสมดุลของโหลด
         </h2>
-        <button className="text-xs font-medium text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition">
-          📈 ดูรายเฟสแบบกราฟ
-        </button>
+        <Link
+          href={`/admin/buildings/${buildingId}/phase`} // หรือ route หน้า phase ของคุณ
+          className="text-xs bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg border border-emerald-200 flex items-center gap-1"
+        >
+          📊 ดูรายเฟสแบบกราฟ
+        </Link>
       </div>
 
       <div className="overflow-x-auto">
@@ -70,19 +77,17 @@ export default function PhaseTable({ latestData }: PhaseTableProps) {
                 <td className="py-3 px-3">{formatNumber(p.voltage, 0)} V</td>
                 <td className="py-3 px-3">{formatNumber(p.current, 1)} A</td>
                 <td className="py-3 px-3">{formatNumber(p.pf, 2)}</td>
-                <td className="py-3 px-3">{formatNumber(p.thd, 0)} %</td>
+                <td className="py-3 px-3">{formatNumber(p.thd, 1)} %</td>
                 <td className="py-3 px-3 text-center">
                   <span
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                      p.isError
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${p.isError
                         ? "bg-red-100 text-red-700"
                         : "bg-emerald-100 text-emerald-700"
-                    }`}
+                      }`}
                   >
                     <span
-                      className={`w-1.5 h-1.5 rounded-full ${
-                        p.isError ? "bg-red-500" : "bg-emerald-500"
-                      }`}
+                      className={`w-1.5 h-1.5 rounded-full ${p.isError ? "bg-red-500" : "bg-emerald-500"
+                        }`}
                     />
                     {p.isError ? "ผิดปกติ" : "ปกติ"}
                   </span>

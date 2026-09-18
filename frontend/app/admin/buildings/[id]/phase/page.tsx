@@ -36,8 +36,10 @@ export default function PhasePage({ params }: { params: Promise<{ id: string }> 
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    async function fetchPhaseTelemetry() {
-      setLoading(true);
+    let isMounted = true;
+
+    async function fetchPhaseTelemetry(isInitial = false) {
+      if (isInitial) setLoading(true);
       const buildingIdNum = Number(buildingId);
 
       // 1. คำนวณช่วงเวลาเริ่มต้น
@@ -63,9 +65,10 @@ export default function PhasePage({ params }: { params: Promise<{ id: string }> 
 
         // หากแม้อาคารนี้ไม่มี device เชื่อมอยู่ ให้หยุดการดึงข้อมูล
         if (deviceIds.length === 0) {
-          setChartData([]);
-          setCurrentUnbalance(0);
-          setLoading(false);
+          if (isMounted) {
+            setChartData([]);
+            setCurrentUnbalance(0);
+          }
           return;
         }
 
@@ -96,30 +99,44 @@ export default function PhasePage({ params }: { params: Promise<{ id: string }> 
             pf_a: row.power_factor ?? 0,
             pf_b: row.power_factor ?? 0,
             pf_c: row.power_factor ?? 0,
-            pf: row.power_factor ?? 0,
             p_a: row.power_a ?? 0,
             p_b: row.power_b ?? 0,
             p_c: row.power_c ?? 0,
           }));
 
-          setChartData(formatted);
+          if (isMounted) {
+            setChartData(formatted);
 
-          if (data[0]?.current_unbalance_pct !== undefined) {
-            setCurrentUnbalance(data[0].current_unbalance_pct);
+            if (data[0]?.current_unbalance_pct !== undefined) {
+              setCurrentUnbalance(data[0].current_unbalance_pct);
+            }
           }
         } else {
-          setChartData([]);
-          setCurrentUnbalance(0);
+          if (isMounted) {
+            setChartData([]);
+            setCurrentUnbalance(0);
+          }
         }
       } catch (err) {
         console.error('Failed to fetch phase telemetry:', err);
-        setChartData([]);
+        if (isMounted) setChartData([]);
       } finally {
-        setLoading(false);
+        if (isMounted && isInitial) setLoading(false);
       }
     }
 
-    fetchPhaseTelemetry();
+    // เรียกครั้งแรก (เปิด Spinner โหลด)
+    fetchPhaseTelemetry(true);
+
+    // ดึงข้อมูลใหม่ทุกๆ 5 วินาที
+    const interval = setInterval(() => {
+      fetchPhaseTelemetry(false);
+    }, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [buildingId, timeRange]);
 
   const getTimeRangeLabel = () => {
@@ -137,7 +154,8 @@ export default function PhasePage({ params }: { params: Promise<{ id: string }> 
 
   const handleExportCSV = () => {
     if (chartData.length === 0) return;
-    const headers = 'Time,Voltage A (V),Voltage B (V),Voltage C (V),Current A (A),Current B (A),Current C (A),Power A (kW),Power B (kW),Power C (kW)\n';
+    const headers =
+      'Time,Voltage A (V),Voltage B (V),Voltage C (V),Current A (A),Current B (A),Current C (A),Power A (kW),Power B (kW),Power C (kW)\n';
     const rows = chartData
       .map(
         (d) =>

@@ -26,30 +26,60 @@ export default function BuildingSidebar({ buildingId }: BuildingSidebarProps) {
   const [isOnline, setIsOnline] = useState<boolean>(false);
 
   useEffect(() => {
-    async function fetchBuilding() {
+    async function fetchBuildingAndStatus() {
       if (!buildingId) return;
 
-      // ดึงคอลัมน์ name และ status ตาม schema จริงใน Supabase
-      const { data, error } = await supabase
-        .from('buildings')
-        .select('name, status')
-        .eq('id', buildingId)
-        .single();
+      try {
+        // 1. ดึงชื่ออาคาร
+        const { data: building } = await supabase
+          .from('buildings')
+          .select('name')
+          .eq('id', buildingId)
+          .single();
 
-      if (data && !error) {
-        setBuildingName(data.name || 'ไม่ระบุชื่ออาคาร');
-        // ตรวจสอบค่า status (รองรับการเช็คคำว่า 'online' หรือ 'active')
-        const currentStatus = String(data.status).toLowerCase();
-        setIsOnline(currentStatus === 'online' || currentStatus === 'active');
-      } else {
-        setBuildingName('ไม่พบข้อมูลอาคาร');
+        if (building) setBuildingName(building.name || 'ไม่ระบุชื่ออาคาร');
+
+        // 2. ดึง device_id ของอาคารนี้
+        const { data: devices } = await supabase
+          .from('devices')
+          .select('id')
+          .eq('building_id', buildingId);
+
+        const deviceIds = devices?.map((d) => d.id) || [];
+
+        if (deviceIds.length > 0) {
+          // 3. ดึงเวลาอ่านค่าล่าสุดของอุปกรณ์ในอาคารนี้
+          const { data: latestReading } = await supabase
+            .from('energy_readings')
+            .select('reading_time')
+            .in('device_id', deviceIds)
+            .order('reading_time', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (latestReading?.reading_time) {
+            const lastTime = new Date(latestReading.reading_time).getTime();
+            const now = new Date().getTime();
+            const diffMinutes = (now - lastTime) / (1000 * 60);
+
+            // ถ้ามีข้อมูลเข้ามาภายใน 10 นาที ถือว่า Online
+            setIsOnline(diffMinutes <= 10);
+          } else {
+            setIsOnline(false);
+          }
+        } else {
+          setIsOnline(false);
+        }
+      } catch (err) {
+        console.error('Fetch status error:', err);
         setIsOnline(false);
       }
     }
 
-    fetchBuilding();
+    fetchBuildingAndStatus();
   }, [buildingId]);
 
+  
   const navItems = [
     { id: 'overview', label: 'ภาพรวม', icon: LayoutGrid, href: `/admin/buildings/${buildingId}` },
     { id: 'phases', label: 'รายเฟส', icon: Layers, href: `/admin/buildings/${buildingId}/phase` },
@@ -90,11 +120,10 @@ export default function BuildingSidebar({ buildingId }: BuildingSidebarProps) {
               <Link
                 key={item.id}
                 href={item.href}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  isActive
-                    ? 'bg-emerald-50 text-emerald-800 font-semibold'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
+                  ? 'bg-emerald-50 text-emerald-800 font-semibold'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
               >
                 <Icon
                   size={18}

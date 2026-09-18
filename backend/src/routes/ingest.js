@@ -15,11 +15,11 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 router.use(verifyApiKey);
 
 // ฟังก์ชันสร้าง Timestamp เวลาไทย (UTC+7)
-// const getThaiTime = () => {
-//   const now = new Date();
-//   const thaiDate = new Date(now.getTime() + (7 * 60 * 60 * 1000));
-//   return thaiDate.toISOString().replace('Z', '');
-// };
+const getThaiTime = () => {
+  const now = new Date();
+  const thaiDate = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+  return thaiDate.toISOString().replace('Z', '');
+};
 
 // ฟังก์ชันรับและแมปค่ารองรับทั้ง ESP32 (camelCase) และ Database (snake_case)
 const handleIngestReadings = async (req, res) => {
@@ -35,7 +35,7 @@ const handleIngestReadings = async (req, res) => {
   // แปลงค่าจาก ESP32 ให้ลงคอลัมน์ Supabase ถูกต้อง
   const payload = {
     device_id,
-    reading_time: body.reading_time || new Date().toISOString(),
+    reading_time: body.reading_time || getThaiTime(),
 
     // แรงดันไฟฟ้า (System & Per-Phase)
     voltage_system: body.voltageSystemV ?? body.voltage_system ?? null,
@@ -119,7 +119,7 @@ router.post('/anomalies', async (req, res) => {
       .insert([
         {
           device_id,
-          detected_at: detected_at || new Date().toISOString(), 
+          detected_at: detected_at || getThaiTime(),
           type,
           severity: severity || 'medium',
           description: description || null,

@@ -49,12 +49,68 @@ const handleIngestReadings = async (req, res) => {
     current_b: body.currentL2A ?? body.current_b ?? null,
     current_c: body.currentL3A ?? body.current_c ?? null,
 
+<<<<<<< Updated upstream
     // กำลังไฟฟ้า และ พลังงาน (System & Per-Phase)
     power_kw: body.realPowerKw ?? body.power_kw ?? null,
     power_a: body.realPowerL1Kw ?? body.power_a ?? null,
     power_b: body.realPowerL2Kw ?? body.power_b ?? null,
     power_c: body.realPowerL3Kw ?? body.power_c ?? null,
     energy_kwh: body.energyKwh ?? body.energy_kwh ?? null,
+=======
+  // กำลังไฟฟ้า และ พลังงาน (System & Per-Phase)
+  power_kw: body.realPowerKw ?? body.power_kw ?? null,
+  power_a: body.realPowerL1Kw ?? body.power_a ?? null,
+  power_b: body.realPowerL2Kw ?? body.power_b ?? null,
+  power_c: body.realPowerL3Kw ?? body.power_c ?? null,
+  energy_kwh: body.energyKwh ?? body.energy_kwh ?? null,
+
+  // Power Factor (System & Per-Phase)
+  power_factor: body.powerFactor ?? body.power_factor ?? null,
+  pf_a: body.powerFactorL1 ?? body.pf_a ?? null, // เพิ่ม PF รายเฟส
+  pf_b: body.powerFactorL2 ?? body.pf_b ?? null,
+  pf_c: body.powerFactorL3 ?? body.pf_c ?? null,
+
+  // ค่าคุณภาพไฟฟ้า
+  frequency_hz: body.frequencyHz ?? body.frequency_hz ?? null,
+  voltage_unbalance_pct: body.voltageUnbalPct ?? body.voltagePhaseUnbalancePct ?? body.voltage_unbalance_pct ?? null, // แก้ไขชื่อให้ตรง Arduino
+  current_unbalance_pct: body.currentUnbalPct ?? body.current_unbalance_pct ?? null,
+  thd_voltage_l1_pct: body.thdVoltageL1Pct ?? body.thd_voltage_l1_pct ?? null,
+  thd_current_l1_pct: body.thdCurrentL1Pct ?? body.thd_current_l1_pct ?? null,
+};
+
+
+  // const payload = {
+  //   device_id,
+  //   reading_time: body.reading_time || getThaiTime(), // ✅ เรียกใช้เวลาไทย (UTC+7) เรียบร้อยแล้ว
+
+  //   // แรงดันไฟฟ้า
+  //   voltage_system: body.voltageSystemV ?? body.voltage_system ?? null,
+  //   voltage_a: body.voltage_a ?? body.voltageSystemV ?? null,
+  //   voltage_b: body.voltage_b ?? null,
+  //   voltage_c: body.voltage_c ?? null,
+ 
+  //   // กระแสไฟฟ้า
+  //   current_system: body.currentSystemA ?? body.current_system ?? null,
+  //   current_a: body.current_a ?? body.currentSystemA ?? null,
+  //   current_b: body.current_b ?? null,
+  //   current_c: body.current_c ?? null,
+
+  //   // กำลังไฟฟ้า และ พลังงาน
+  //   power_kw: body.realPowerKw ?? body.power_kw ?? null,
+  //   power_a: body.power_a ?? null,
+  //   power_b: body.power_b ?? null,
+  //   power_c: body.power_c ?? null,
+  //   energy_kwh: body.energyKwh ?? body.energy_kwh ?? null,
+
+  //   // ค่าทางไฟฟ้าอื่นๆ
+  //   power_factor: body.powerFactor ?? body.power_factor ?? null,
+  //   frequency_hz: body.frequencyHz ?? body.frequency_hz ?? null,
+  //   voltage_unbalance_pct: body.voltagePhaseUnbalancePct ?? body.voltage_unbalance_pct ?? null,
+  //   current_unbalance_pct: body.currentUnbalancePct ?? body.current_unbalance_pct ?? null,
+  //   thd_voltage_l1_pct: body.thdVoltageL1Pct ?? body.thd_voltage_l1_pct ?? null,
+  //   thd_current_l1_pct: body.thdCurrentL1Pct ?? body.thd_current_l1_pct ?? null,
+  // };
+>>>>>>> Stashed changes
 
     // Power Factor (System & Per-Phase)
     power_factor: body.powerFactor ?? body.power_factor ?? null,

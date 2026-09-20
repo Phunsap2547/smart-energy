@@ -11,7 +11,7 @@ import {
   Tooltip,
 } from "recharts";
 import { EnergyIngest } from "@/types/energy";
-import { formatNumber } from "@/lib/formatter";
+import { formatNumber, formatChartTime } from "@/lib/formatter";
 
 type TimeFilter = "1D" | "7D" | "30D" | "12M";
 
@@ -20,58 +20,34 @@ interface ActiveEnergyChartProps {
   filter: TimeFilter;
 }
 
-function getCutoffDate(filter: TimeFilter): Date {
-  const now = new Date();
-  const cutoff = new Date(now);
-  switch (filter) {
-    case "1D":
-      cutoff.setHours(now.getHours() - 24);
-      break;
-    case "7D":
-      cutoff.setDate(now.getDate() - 7);
-      break;
-    case "30D":
-      cutoff.setDate(now.getDate() - 30);
-      break;
-    case "12M":
-      cutoff.setMonth(now.getMonth() - 12);
-      break;
+// ช่วยเติม Z บังคับให้ JS อ่านค่าเป็น UTC เสมอ
+function ensureUTC(raw: string): string {
+  let s = raw.trim().replace(" ", "T");
+  if (!s.endsWith("Z") && !/[+-]\d{2}:\d{2}$/.test(s)) {
+    s += "Z";
   }
-  return cutoff;
+  return s;
 }
 
 function bucketKey(date: Date, filter: TimeFilter): string {
-  if (filter === "1D") {
-    // group by hour:minute (no aggregation, raw points)
-    return date.toISOString();
-  }
   if (filter === "12M") {
-    return `${date.getFullYear()}-${date.getMonth()}`;
+    return `${date.getUTCFullYear()}-${date.getUTCMonth() + 1}`;
   }
-  // 7D / 30D -> group by day
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+  return `${date.getUTCFullYear()}-${date.getUTCMonth() + 1}-${date.getUTCDate()}`;
 }
 
 function labelFor(date: Date, filter: TimeFilter): string {
-  if (filter === "1D") {
-    return date.toLocaleTimeString("th-TH", {
-      timeZone: "Asia/Bangkok",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-  }
   if (filter === "12M") {
     return date.toLocaleDateString("th-TH", {
-      timeZone: "Asia/Bangkok",
       month: "short",
       year: "2-digit",
+      timeZone: "Asia/Bangkok",
     });
   }
   return date.toLocaleDateString("th-TH", {
-    timeZone: "Asia/Bangkok",
     day: "2-digit",
     month: "2-digit",
+    timeZone: "Asia/Bangkok",
   });
 }
 
@@ -84,45 +60,34 @@ export default function ActiveEnergyChart({ data, filter }: ActiveEnergyChartPro
     );
   }
 
-  const cutoff = getCutoffDate(filter);
-
-  // filter by range
-  const filtered = data.filter((item) => {
-    const raw = item.reading_time || item.created_at;
-    if (!raw) return false;
-    const d = new Date(raw);
-    return d >= cutoff;
+  // 1. เรียงลำดับตามเวลาแบบ UTC
+  const sorted = [...data].sort((a, b) => {
+    const rawA = ensureUTC(a.reading_time || a.created_at || "");
+    const rawB = ensureUTC(b.reading_time || b.created_at || "");
+    return new Date(rawA).getTime() - new Date(rawB).getTime();
   });
 
-  // sort chronologically
-  const sorted = [...filtered].sort((a, b) => {
-    const da = new Date(a.reading_time || a.created_at || 0).getTime();
-    const db = new Date(b.reading_time || b.created_at || 0).getTime();
-    return da - db;
-  });
-
-  // energy_kwh มักเป็นค่าสะสม (cumulative) -> เอาค่าล่าสุดของแต่ละ bucket
-  const buckets = new Map<string, { date: Date; value: number }>();
+  // 2. รวบรวมข้อมูลลง Bucket
+  const buckets = new Map<string, { rawTime: string; date: Date; value: number }>();
   for (const item of sorted) {
     const raw = item.reading_time || item.created_at;
-    const d = raw ? new Date(raw) : new Date();
-    const key = bucketKey(d, filter);
+    if (!raw) continue;
+
+    const safeRaw = ensureUTC(raw);
+    const d = new Date(safeRaw);
+    const key = filter === "1D" ? (isNaN(d.getTime()) ? raw : d.getTime().toString()) : bucketKey(d, filter);
     const value = Number(item.energy_kwh ?? item.power_kw ?? 0);
-    buckets.set(key, { date: d, value }); // overwrite -> last value wins
+
+    buckets.set(key, { rawTime: raw, date: d, value });
   }
 
-  const chartData = Array.from(buckets.values()).map(({ date, value }) => ({
-    time: labelFor(date, filter),
-    energy: value,
-  }));
-
-  if (chartData.length === 0) {
-    return (
-      <div className="h-48 flex items-center justify-center text-gray-400 text-sm">
-        ไม่มีข้อมูลในช่วงเวลาที่เลือก
-      </div>
-    );
-  }
+  // 3. แปลงเวลาสำหรับแกน X
+  const chartData = Array.from(buckets.values())
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .map(({ rawTime, date, value }) => ({
+      time: filter === "1D" ? formatChartTime(rawTime) : labelFor(date, filter),
+      energy: value,
+    }));
 
   return (
     <div className="h-48 w-full pt-2">

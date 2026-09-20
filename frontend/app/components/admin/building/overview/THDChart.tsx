@@ -11,7 +11,7 @@ import {
   Tooltip,
 } from "recharts";
 import { EnergyIngest } from "@/types/energy";
-import { formatNumber } from "@/lib/formatter";
+import { formatNumber, formatChartTime } from "@/lib/formatter";
 
 type TimeFilter = "1D" | "7D" | "30D" | "12M";
 
@@ -20,50 +20,21 @@ interface THDChartProps {
   filter: TimeFilter;
 }
 
-function getCutoffDate(filter: TimeFilter): Date {
-  const now = new Date();
-  const cutoff = new Date(now);
-  switch (filter) {
-    case "1D":
-      cutoff.setHours(now.getHours() - 24);
-      break;
-    case "7D":
-      cutoff.setDate(now.getDate() - 7);
-      break;
-    case "30D":
-      cutoff.setDate(now.getDate() - 30);
-      break;
-    case "12M":
-      cutoff.setMonth(now.getMonth() - 12);
-      break;
-  }
-  return cutoff;
-}
-
 function bucketKey(date: Date, filter: TimeFilter): string {
-  if (filter === "1D") return date.toISOString();
-  if (filter === "12M") return `${date.getFullYear()}-${date.getMonth()}`;
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+  if (filter === "12M") {
+    return `${date.getFullYear()}-${date.getMonth() + 1}`;
+  }
+  return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 }
 
 function labelFor(date: Date, filter: TimeFilter): string {
-  if (filter === "1D") {
-    return date.toLocaleTimeString("th-TH", {
-      timeZone: "Asia/Bangkok",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-  }
   if (filter === "12M") {
     return date.toLocaleDateString("th-TH", {
-      timeZone: "Asia/Bangkok",
       month: "short",
       year: "2-digit",
     });
   }
   return date.toLocaleDateString("th-TH", {
-    timeZone: "Asia/Bangkok",
     day: "2-digit",
     month: "2-digit",
   });
@@ -78,36 +49,39 @@ export default function THDChart({ data, filter }: THDChartProps) {
     );
   }
 
-  const cutoff = getCutoffDate(filter);
-
-  const filtered = data.filter((item) => {
-    const raw = item.reading_time || item.created_at;
-    if (!raw) return false;
-    const d = new Date(raw);
-    return d >= cutoff;
+  // 1. เรียงลำดับตามเวลา (แทนที่เว้นวรรคด้วย T รองรับ Safari)
+  const sorted = [...data].sort((a, b) => {
+    const rawA = (a.reading_time || a.created_at || "").replace(" ", "T");
+    const rawB = (b.reading_time || b.created_at || "").replace(" ", "T");
+    return new Date(rawA).getTime() - new Date(rawB).getTime();
   });
 
-  // THD เป็นค่า instant -> ใช้ค่าเฉลี่ยต่อ bucket
-  const buckets = new Map<string, { date: Date; sum: number; count: number }>();
-  for (const item of filtered) {
+  // 2. รวบรวมข้อมูลและหาค่าเฉลี่ยลง Bucket
+  const buckets = new Map<string, { rawTime: string; date: Date; sum: number; count: number }>();
+  for (const item of sorted) {
     const raw = item.reading_time || item.created_at;
-    const d = raw ? new Date(raw) : new Date();
-    const key = bucketKey(d, filter);
-    const value = Number(item.thd_voltage_l1_pct ?? 0);
+    if (!raw) continue;
+
+    const safeRaw = raw.replace(" ", "T");
+    const d = new Date(safeRaw);
+    const key = filter === "1D" ? (isNaN(d.getTime()) ? raw : d.getTime().toString()) : bucketKey(d, filter);
+
+    const thdVal = Number(item.thd_voltage_l1_pct ?? 0);
 
     const existing = buckets.get(key);
     if (existing) {
-      existing.sum += value;
+      existing.sum += thdVal;
       existing.count += 1;
     } else {
-      buckets.set(key, { date: d, sum: value, count: 1 });
+      buckets.set(key, { rawTime: raw, date: d, sum: thdVal, count: 1 });
     }
   }
 
+  // 3. แปลงเวลาสำหรับแกน X
   const chartData = Array.from(buckets.values())
     .sort((a, b) => a.date.getTime() - b.date.getTime())
-    .map(({ date, sum, count }) => ({
-      time: labelFor(date, filter),
+    .map(({ rawTime, date, sum, count }) => ({
+      time: filter === "1D" ? formatChartTime(rawTime) : labelFor(date, filter),
       thd: Number((sum / count).toFixed(1)),
     }));
 

@@ -62,16 +62,12 @@ export default function BuildingOverviewPage() {
       let startDate = new Date();
 
       if (timeFilter === "1D") {
-        // ย้อนหลัง 24 ชั่วโมงจากเวลาปัจจุบัน ณ ตอนนั้น
         startDate.setTime(now.getTime() - 24 * 60 * 60 * 1000);
       } else if (timeFilter === "7D") {
-        // ย้อนหลัง 7 วัน
         startDate.setDate(now.getDate() - 7);
       } else if (timeFilter === "30D") {
-        // ย้อนหลัง 30 วัน
         startDate.setDate(now.getDate() - 30);
       } else if (timeFilter === "12M") {
-        // ย้อนหลัง 1 ปี (12 เดือน)
         startDate.setFullYear(now.getFullYear() - 1);
       }
 
@@ -98,10 +94,8 @@ export default function BuildingOverviewPage() {
 
   // Realtime & Polling Data Fetching
   useEffect(() => {
-    // ดึงข้อมูลครั้งแรก
     fetchIngestData();
 
-    // Supabase Realtime Subscription
     const channel = supabase
       .channel(`energy_readings_b${buildingId}`)
       .on(
@@ -115,7 +109,6 @@ export default function BuildingOverviewPage() {
       )
       .subscribe();
 
-    // Polling ดึงข้อมูลใหม่ทุกๆ 5 วินาที
     const interval = setInterval(fetchIngestData, 5000);
 
     return () => {
@@ -251,7 +244,7 @@ export default function BuildingOverviewPage() {
 
             <OverviewCard
               title="Frequency"
-              value={formatNumber(freq, 0)}
+              value={formatNumber(freq, 1)} /* แก้ไขทศนิยมเป็น 1 ตำแหน่ง */
               unit="Hz"
               subtitle="ความถี่"
               statusLabel={isFreqAnomaly ? "ผิดปกติ" : "ปกติ"}
@@ -318,8 +311,9 @@ export default function BuildingOverviewPage() {
             <div className="lg:col-span-1 bg-white rounded-xl p-5 border border-gray-200 shadow-sm space-y-4">
               <div className="flex justify-between items-start">
                 <div>
+                  {/* แก้ไขหัวข้อเป็น THD voltage (L1) */}
                   <p className="text-sm font-medium text-gray-500">
-                    THD voltage เฉลี่ย
+                    THD voltage (L1)
                   </p>
                   <div className="flex items-baseline gap-1 mt-1">
                     <span className="text-2xl font-bold text-gray-900">
@@ -327,8 +321,9 @@ export default function BuildingOverviewPage() {
                     </span>
                     <span className="text-sm text-gray-500 font-medium">%</span>
                   </div>
+                  {/* แก้ไขคำอธิบายเป็น ค่าความเพี้ยนแรงดัน L1 */}
                   <p className="text-xs text-gray-400 mt-1">
-                    ค่าความเพี้ยนแรงดันเฉลี่ย
+                    ค่าความเพี้ยนแรงดัน L1
                   </p>
                 </div>
                 {/* ปุ่ม Filter ของ THD Chart */}

@@ -14,27 +14,97 @@ import { supabase } from '@/lib/supabase';
 
 interface DailyEnergyChartProps {
   buildingId: string;
+  timeRange?: 'day' | '7d' | '30d';
+  selectedDate?: string;
 }
 
-interface DailyDataItem {
-  day: string;
+interface ChartDataItem {
+  label: string;
+  fullDateText: string; 
   energy: number;
 }
 
-const DAYS_TH = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+const DAYS_TH_FULL = [
+  'วันอาทิตย์',
+  'วันจันทร์',
+  'วันอังคาร',
+  'วันพุธ',
+  'วันพฤหัสบดี',
+  'วันศุกร์',
+  'วันเสาร์',
+];
 
-export default function DailyEnergyChart({ buildingId }: DailyEnergyChartProps) {
-  const [data, setData] = useState<DailyDataItem[]>([]);
+const DAYS_TH_SHORT = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+
+const MONTHS_TH_FULL = [
+  'มกราคม',
+  'กุมภาพันธ์',
+  'มีนาคม',
+  'เมษายน',
+  'พฤษภาคม',
+  'มิถุนายน',
+  'กรกฎาคม',
+  'สิงหาคม',
+  'กันยายน',
+  'ตุลาคม',
+  'พฤศจิกายน',
+  'ธันวาคม',
+];
+
+// แปลง Date Object เป็น YYYY-MM-DD
+const formatDateStr = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// แปลง Date Object เป็นข้อความวันที่เต็มภาษาไทย (เช่น วันจันทร์ที่ 29 กันยายน 2569)
+const formatFullThaiDate = (d: Date, isHourView: boolean = false, hourStr: string = ''): string => {
+  const dayName = DAYS_TH_FULL[d.getDay()];
+  const dateNum = d.getDate();
+  const monthName = MONTHS_TH_FULL[d.getMonth()];
+  const thaiYear = d.getFullYear() + 543;
+
+  if (isHourView) {
+    return `${dayName}ที่ ${dateNum} ${monthName} ${thaiYear} เวลา ${hourStr} น.`;
+  }
+  return `${dayName}ที่ ${dateNum} ${monthName} ${thaiYear}`;
+};
+
+// แกะชั่วโมงจาก Timestamp
+const extractHourFromTimestamp = (readingTimeStr: string): string => {
+  if (!readingTimeStr) return '00:00';
+  let timePart = '';
+  if (readingTimeStr.includes('T')) {
+    timePart = readingTimeStr.split('T')[1];
+  } else if (readingTimeStr.includes(' ')) {
+    timePart = readingTimeStr.split(' ')[1];
+  }
+  if (timePart) {
+    const hour = timePart.split(':')[0];
+    if (hour && !isNaN(Number(hour))) {
+      return `${String(Number(hour)).padStart(2, '0')}:00`;
+    }
+  }
+  return '00:00';
+};
+
+export default function DailyEnergyChart({
+  buildingId,
+  timeRange = 'day',
+  selectedDate,
+}: DailyEnergyChartProps) {
+  const [data, setData] = useState<ChartDataItem[]>([]);
   const [avgEnergy, setAvgEnergy] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const fetchDailyEnergy = useCallback(async () => {
+  const fetchEnergyChartData = useCallback(async () => {
     if (!buildingId) return;
 
     try {
       setLoading(true);
 
-      // 1. ดึง device_id ทั้งหมดของอาคารนี้
       const { data: devices, error: deviceError } = await supabase
         .from('devices')
         .select('id')
@@ -48,68 +118,125 @@ export default function DailyEnergyChart({ buildingId }: DailyEnergyChartProps) 
 
       const deviceIds = devices.map((d) => d.id);
 
-      // 2. คำนวณช่วงเวลา 7 วันย้อนหลัง
-      const now = new Date();
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(now.getDate() - 6);
-      sevenDaysAgo.setHours(0, 0, 0, 0);
+      // 1. คำนวณช่วงวันที่เริ่มต้น - สิ้นสุด ตาม timeRange
+      const targetDateObj = selectedDate ? new Date(selectedDate) : new Date();
+      const endDateObj = new Date(targetDateObj);
+      const startDateObj = new Date(targetDateObj);
 
-      // 3. ดึงข้อมูล energy_readings ในรอบ 7 วัน
-      const { data: readings, error: readingsError } = await supabase
-        .from('energy_readings')
-        .select('reading_time, energy_kwh')
-        .in('device_id', deviceIds)
-        .gte('reading_time', sevenDaysAgo.toISOString())
-        .order('reading_time', { ascending: true });
-
-      if (readingsError) {
-        console.error('Error fetching daily energy readings:', readingsError);
-        return;
+      if (timeRange === '7d') {
+        startDateObj.setDate(targetDateObj.getDate() - 6);
+      } else if (timeRange === '30d') {
+        startDateObj.setDate(targetDateObj.getDate() - 29);
       }
 
-      if (!readings || readings.length === 0) {
-        setData([]);
-        setAvgEnergy(0);
-        return;
+      const startDateStr = `${formatDateStr(startDateObj)} 00:00:00`;
+      const endDateStr = `${formatDateStr(endDateObj)} 23:59:59`;
+
+      // 2. ดึงข้อมูลแบบ Pagination Loop
+      let allReadings: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const from = page * pageSize;
+        const to = from + pageSize - 1;
+
+        const { data: batch, error: batchError } = await supabase
+          .from('energy_readings')
+          .select('reading_time, energy_kwh')
+          .in('device_id', deviceIds)
+          .gte('reading_time', startDateStr)
+          .lte('reading_time', endDateStr)
+          .order('reading_time', { ascending: true })
+          .range(from, to);
+
+        if (batchError || !batch || batch.length === 0) {
+          hasMore = false;
+        } else {
+          allReadings = [...allReadings, ...batch];
+          if (batch.length < pageSize) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        }
       }
 
-      // 4. จัดกลุ่มตามวัน และคำนวณพลังงานที่ใช้ในแต่ละวัน (Max kWh - Min kWh)
-      const dailyMap: { [key: string]: { min: number; max: number; dayName: string } } = {};
+      // 3. สร้าง Skeleton มารอไว้ก่อน
+      const groupedMap: { 
+        [key: string]: { 
+          min: number | null; 
+          max: number | null; 
+          label: string;
+          fullDateText: string;
+        } 
+      } = {};
 
-      readings.forEach((item) => {
+      if (timeRange === 'day') {
+        for (let h = 0; h < 24; h++) {
+          const hourStr = `${String(h).padStart(2, '0')}:00`;
+          groupedMap[hourStr] = { 
+            min: null, 
+            max: null, 
+            label: hourStr,
+            fullDateText: formatFullThaiDate(targetDateObj, true, hourStr),
+          };
+        }
+      } else {
+        const totalDays = timeRange === '7d' ? 7 : 30;
+        for (let i = totalDays - 1; i >= 0; i--) {
+          const d = new Date(targetDateObj);
+          d.setDate(d.getDate() - i);
+          const dateKey = formatDateStr(d);
+          const label = timeRange === '7d' ? DAYS_TH_SHORT[d.getDay()] : `${d.getDate()}/${d.getMonth() + 1}`;
+          
+          groupedMap[dateKey] = { 
+            min: null, 
+            max: null, 
+            label,
+            fullDateText: formatFullThaiDate(d),
+          };
+        }
+      }
+
+      // 4. จัดกลุ่มข้อมูลลง groupedMap
+      allReadings.forEach((item) => {
         if (item.energy_kwh === null || item.energy_kwh === undefined) return;
 
-        const dateObj = new Date(item.reading_time);
-        const dateKey = dateObj.toISOString().split('T')[0];
-        const dayName = DAYS_TH[dateObj.getDay()];
+        let groupKey = '';
 
-        if (!dailyMap[dateKey]) {
-          dailyMap[dateKey] = {
-            min: item.energy_kwh,
-            max: item.energy_kwh,
-            dayName,
-          };
+        if (timeRange === 'day') {
+          groupKey = extractHourFromTimestamp(item.reading_time);
         } else {
-          dailyMap[dateKey].min = Math.min(dailyMap[dateKey].min, item.energy_kwh);
-          dailyMap[dateKey].max = Math.max(dailyMap[dateKey].max, item.energy_kwh);
+          const datePart = item.reading_time.replace('T', ' ').split(' ')[0];
+          groupKey = datePart;
+        }
+
+        if (groupedMap[groupKey]) {
+          const currentMin = groupedMap[groupKey].min;
+          const currentMax = groupedMap[groupKey].max;
+
+          groupedMap[groupKey].min = currentMin === null ? item.energy_kwh : Math.min(currentMin, item.energy_kwh);
+          groupedMap[groupKey].max = currentMax === null ? item.energy_kwh : Math.max(currentMax, item.energy_kwh);
         }
       });
 
-      // แปลงข้อมูลเพื่อส่งให้ Recharts
-      const chartData: DailyDataItem[] = Object.keys(dailyMap)
+      // 5. คำนวณพลังงาน (Max - Min)
+      const chartData: ChartDataItem[] = Object.keys(groupedMap)
         .sort()
-        .map((dateKey) => {
-          const item = dailyMap[dateKey];
-          const diff = Math.max(0, item.max - item.min);
+        .map((key) => {
+          const item = groupedMap[key];
+          const diff = (item.max !== null && item.min !== null) ? Math.max(0, item.max - item.min) : 0;
           return {
-            day: item.dayName,
+            label: item.label,
+            fullDateText: item.fullDateText,
             energy: Number(diff.toFixed(1)),
           };
         });
 
       setData(chartData);
 
-      // คำนวณค่าเฉลี่ยต่อวัน
       if (chartData.length > 0) {
         const total = chartData.reduce((sum, d) => sum + d.energy, 0);
         setAvgEnergy(Number((total / chartData.length).toFixed(1)));
@@ -117,26 +244,34 @@ export default function DailyEnergyChart({ buildingId }: DailyEnergyChartProps) 
         setAvgEnergy(0);
       }
     } catch (err) {
-      console.error('Daily energy fetch error:', err);
+      console.error('Daily energy chart fetch error:', err);
     } finally {
       setLoading(false);
     }
-  }, [buildingId]);
+  }, [buildingId, timeRange, selectedDate]);
 
   useEffect(() => {
-    fetchDailyEnergy();
-  }, [buildingId, fetchDailyEnergy]);
+    fetchEnergyChartData();
+  }, [fetchEnergyChartData]);
+
+  const chartTitle = timeRange === 'day' 
+    ? 'การใช้พลังงานรายชั่วโมง (kWh)' 
+    : timeRange === '7d' 
+    ? 'การใช้พลังงานรายวัน (7 วันล่าสุด)' 
+    : 'การใช้พลังงานรายวัน (30 วันล่าสุด)';
+
+  const avgLabel = timeRange === 'day' ? 'kWh/ชั่วโมง' : 'kWh/วัน';
 
   return (
     <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-bold text-slate-800 text-sm">การใช้พลังงานรายวัน (kWh)</h3>
-          <p className="text-xs text-slate-400 mt-0.5">ปริมาณการใช้งานในสัปดาห์นี้</p>
+          <h3 className="font-bold text-slate-800 text-sm">{chartTitle}</h3>
+          <p className="text-xs text-slate-400 mt-0.5">ปริมาณการใช้ไฟแยกตามช่วงเวลา</p>
         </div>
         <div className="text-right">
           <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
-            {loading ? 'กำลังคำนวณ...' : `เฉลี่ย ${avgEnergy} kWh/วัน`}
+            {loading ? 'กำลังคำนวณ...' : `เฉลี่ย ${avgEnergy} ${avgLabel}`}
           </span>
         </div>
       </div>
@@ -145,18 +280,37 @@ export default function DailyEnergyChart({ buildingId }: DailyEnergyChartProps) 
         {loading ? (
           <div className="text-xs text-slate-400">กำลังโหลดข้อมูล...</div>
         ) : data.length === 0 ? (
-          <div className="text-xs text-slate-400">ไม่มีข้อมูลการใช้พลังงานในสัปดาห์นี้</div>
+          <div className="text-xs text-slate-400">ไม่มีข้อมูลการใช้พลังงานในช่วงเวลานี้</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
-              <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
-              <Tooltip
-                formatter={(value: number) => [`${value} kWh`, 'ปริมาณการใช้ไฟ']}
-                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+              <XAxis 
+                dataKey="label" 
+                tickLine={false} 
+                axisLine={false} 
+                tick={{ fontSize: 10, fill: '#64748b' }} 
+                interval={0}
               />
-              <Bar dataKey="energy" fill="#10b981" radius={[6, 6, 0, 0]} barSize={28} />
+              <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#64748b' }} />
+              
+              {/* 💡 แสดงข้อมูลวันที่เต็ม พ.ศ. เมื่อนำเมาส์ไปชี้แท่งกราฟ */}
+              <Tooltip
+                labelFormatter={(_, payload) => {
+                  if (payload && payload.length > 0) {
+                    return payload[0].payload.fullDateText;
+                  }
+                  return '';
+                }}
+                formatter={(value: number) => [`${value} kWh`, 'ปริมาณการใช้ไฟ']}
+                contentStyle={{ 
+                  borderRadius: '12px', 
+                  border: 'none', 
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                  fontSize: '12px',
+                }}
+              />
+              <Bar dataKey="energy" fill="#10b981" radius={[6, 6, 0, 0]} barSize={18} />
             </BarChart>
           </ResponsiveContainer>
         )}

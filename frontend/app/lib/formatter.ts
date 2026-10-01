@@ -31,30 +31,28 @@ export const formatVoltage = (value: number | null | undefined): string => {
   return `${formatNumber(value, 1)} V`;
 };
 
-// จัดรูปแบบเวลาแบบสั้นสำหรับแกน X กราฟ (เช่น 14:30)
+// src/lib/formatter.ts
+
 // src/lib/formatter.ts
 
 export function formatChartTime(rawTime: string): string {
   if (!rawTime) return "";
 
-  let formatted = rawTime.trim().replace(" ", "T");
-
-  // ถ้าไม่มี Z หรือ Offset ติดมา ให้เติม Z เพื่อบอกว่าเป็นเวลา UTC
-  if (!formatted.endsWith("Z") && !/[+-]\d{2}:\d{2}$/.test(formatted)) {
-    formatted += "Z";
+  // ดึง HH:mm จากข้อความตรงๆ (เพราะ Backend บวก +7 เป็นเวลาไทยใน String มาแล้ว)
+  // วิธีนี้จะการันตีได้ 100% ว่าจะได้เลขเวลาตรงกับที่เก็บใน DB โดยไม่ถูก JS แปลง Timezone ซ้ำ
+  const timeMatch = rawTime.match(/(\d{2}):(\d{2})/);
+  if (timeMatch) {
+    return `${timeMatch[1]}:${timeMatch[2]}`; // คืนค่า "22:42" ตรงๆ
   }
 
-  const date = new Date(formatted);
+  // Fallback กรณีข้อความไม่อยู่ในฟอร์แมตปกติ
+  const date = new Date(rawTime.replace(" ", "T"));
   if (isNaN(date.getTime())) return "";
-
-  return date.toLocaleTimeString("th-TH", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Bangkok",
-  });
+  
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
 }
-// src/lib/formatter.ts
 
 // export function formatChartTime(rawTime: string): string {
 //   if (!rawTime) return "";

@@ -34,38 +34,19 @@ export const formatVoltage = (value: number | null | undefined): string => {
 // จัดรูปแบบเวลาแบบสั้นสำหรับแกน X กราฟ (เช่น 14:30)
 // src/lib/formatter.ts
 
-export function formatChartTime(rawTime: string): string {
-  if (!rawTime) return "";
-
-  let formatted = rawTime.trim().replace(" ", "T");
-
-  // ถ้าไม่มี Z หรือ Offset ติดมา ให้เติม Z เพื่อบอกว่าเป็นเวลา UTC
-  if (!formatted.endsWith("Z") && !/[+-]\d{2}:\d{2}$/.test(formatted)) {
-    formatted += "Z";
-  }
-
-  const date = new Date(formatted);
-  if (isNaN(date.getTime())) return "";
-
-  return date.toLocaleTimeString("th-TH", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Bangkok",
-  });
-}
-// src/lib/formatter.ts
-
 // export function formatChartTime(rawTime: string): string {
 //   if (!rawTime) return "";
 
-//   // 1. เปลี่ยนเว้นวรรคเป็น T เพื่อให้ Safari อ่านได้ถูกต้อง
-//   const formatted = rawTime.trim().replace(" ", "T");
-//   const date = new Date(formatted);
+//   let formatted = rawTime.trim().replace(" ", "T");
 
+//   // ถ้าไม่มี Z หรือ Offset ติดมา ให้เติม Z เพื่อบอกว่าเป็นเวลา UTC
+//   if (!formatted.endsWith("Z") && !/[+-]\d{2}:\d{2}$/.test(formatted)) {
+//     formatted += "Z";
+//   }
+
+//   const date = new Date(formatted);
 //   if (isNaN(date.getTime())) return "";
 
-//   // 2. แปลงเป็นเวลาไทย HH:mm
 //   return date.toLocaleTimeString("th-TH", {
 //     hour: "2-digit",
 //     minute: "2-digit",
@@ -73,6 +54,25 @@ export function formatChartTime(rawTime: string): string {
 //     timeZone: "Asia/Bangkok",
 //   });
 // }
+// src/lib/formatter.ts
+
+export function formatChartTime(rawTime: string): string {
+  if (!rawTime) return "";
+
+  // 1. เปลี่ยนเว้นวรรคเป็น T เพื่อให้ Safari อ่านได้ถูกต้อง
+  const formatted = rawTime.trim().replace(" ", "T");
+  const date = new Date(formatted);
+
+  if (isNaN(date.getTime())) return "";
+
+  // 2. แปลงเป็นเวลาไทย HH:mm
+  return date.toLocaleTimeString("th-TH", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    // timeZone: "Asia/Bangkok",
+  });
+}
 
 
 

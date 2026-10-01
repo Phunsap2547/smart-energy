@@ -258,3 +258,51 @@
 //     return [];
 //   }
 // }
+
+const express = require('express');
+const supabase = require('../supabase');
+
+const router = express.Router();
+
+/**
+ * GET /api/alerts
+ * ดึงรายการ Alert/Anomaly สำหรับหน้า Public หรือ Dashboard ทั่วไป
+ */
+router.get('/', async (req, res) => {
+  try {
+    const { device_id, type, status, limit = 50 } = req.query;
+
+    let query = supabase
+      .from('anomalies')
+      .select(`
+        id,
+        device_id,
+        type,
+        severity,
+        description,
+        status,
+        created_at,
+        devices ( name )
+      `)
+      .order('created_at', { ascending: false })
+      .limit(parseInt(limit, 10));
+
+    if (device_id) query = query.eq('device_id', device_id);
+    if (type) query = query.eq('type', type);
+    if (status) query = query.eq('status', status);
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    return res.json({
+      success: true,
+      data: data || [],
+    });
+  } catch (error) {
+    console.error('Error fetching alerts:', error);
+    return res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+module.exports = router;

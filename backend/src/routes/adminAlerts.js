@@ -32,140 +32,136 @@
 // module.exports = router;
 
 //adminAlert.js
-// const supabase = require('../supabase');
-// const express = require('express');
+const supabase = require('../supabase');
+const express = require('express');
 
-// const router = express.Router();
+const router = express.Router();
 
-// /**
-//  * 1. GET /api/admin/alerts
-//  * ดึงรายการ Anomaly/Alert ทั้งหมดจากตาราง anomalies สำหรับ Admin Dashboard
-//  */
-// router.get('/', async (req, res) => {
-//   try {
-//     const { status = 'open', severity, buildingId } = req.query;
+/**
+ * 1. GET /api/admin/alerts
+ * ดึงรายการ Anomaly/Alert ทั้งหมดจากตาราง anomalies สำหรับ Admin Dashboard
+ */
+router.get('/', async (req, res) => {
+  try {
+    const { status = 'open', severity, buildingId } = req.query;
 
-//     // Join ตาราง anomalies -> devices -> buildings
-//     let query = supabase
-//       .from('anomalies')
-//       .select(`
-//         id,
-//         type,
-//         severity,
-//         description,
-//         status,
-//         created_at,
-//         device_id,
-//         devices (
-//           id,
-//           name,
-//           building_id,
-//           buildings ( id, name )
-//         )
-//       `)
-//       .order('created_at', { ascending: false });
+    let query = supabase
+      .from('anomalies')
+      .select(`
+        id,
+        type,
+        severity,
+        description,
+        status,
+        created_at,
+        device_id,
+        devices (
+          id,
+          name,
+          building_id,
+          buildings ( id, name )
+        )
+      `)
+      .order('created_at', { ascending: false });
 
-//     // กรองตาม status (ค่าเริ่มต้นคือ 'open', หากต้องการดึงทั้งหมดให้ส่ง status='ALL')
-//     if (status !== 'ALL') {
-//       query = query.eq('status', status);
-//     }
+    if (status !== 'ALL') {
+      query = query.eq('status', status);
+    }
 
-//     if (severity) {
-//       query = query.eq('severity', severity);
-//     }
+    if (severity) {
+      query = query.eq('severity', severity);
+    }
 
-//     const { data, error } = await query;
-//     if (error) throw error;
+    const { data, error } = await query;
+    if (error) throw error;
 
-//     // แปลงข้อมูลให้อยู่ในรูปแบบที่ Frontend นำไป Render ใน Table ได้ง่าย
-//     let formattedData = data.map((item) => ({
-//       id: item.id,
-//       deviceId: item.device_id,
-//       deviceName: item.devices?.name || 'ไม่ทราบชื่ออุปกรณ์',
-//       buildingId: item.devices?.buildings?.id || null,
-//       buildingName: item.devices?.buildings?.name || 'ไม่ทราบชื่ออาคาร',
-//       type: item.type,               // เช่น 'POWER_OUTAGE', 'ML_ANOMALY', 'HIGH_USAGE'
-//       severity: item.severity,       // 'warning', 'danger'
-//       description: item.description, // ข้อความรายละเอียด
-//       status: item.status,           // 'open', 'acknowledged', 'resolved'
-//       createdAt: item.created_at,
-//     }));
+    let formattedData = data.map((item) => ({
+      id: item.id,
+      deviceId: item.device_id,
+      deviceName: item.devices?.name || 'ไม่ทราบชื่ออุปกรณ์',
+      buildingId: item.devices?.buildings?.id || null,
+      buildingName: item.devices?.buildings?.name || 'ไม่ทราบชื่ออาคาร',
+      type: item.type,
+      severity: item.severity,
+      description: item.description,
+      status: item.status,
+      createdAt: item.created_at,
+    }));
 
-//     // หากมีการส่ง buildingId มากรอง
-//     if (buildingId) {
-//       formattedData = formattedData.filter(
-//         (item) => String(item.buildingId) === String(buildingId)
-//       );
-//     }
+    if (buildingId) {
+      formattedData = formattedData.filter(
+        (item) => String(item.buildingId) === String(buildingId)
+      );
+    }
 
-//     return res.json({
-//       success: true,
-//       count: formattedData.length,
-//       data: formattedData,
-//     });
-//   } catch (error) {
-//     console.error('Error in GET /api/admin/alerts:', error);
-//     return res.status(500).json({ success: false, message: error.message });
-//   }
-// });
+    return res.json({
+      success: true,
+      count: formattedData.length,
+      data: formattedData,
+    });
+  } catch (error) {
+    console.error('Error in GET /api/admin/alerts:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
 
-// /**
-//  * 2. GET /api/admin/alerts/summary
-//  * สรุปสถิติ Alert ที่ยังไม่ถูกแก้ไข (status = 'open') เพื่อนำไปแสดงใน Overview Cards
-//  */
-// router.get('/summary', async (req, res) => {
-//   try {
-//     const { data, error } = await supabase
-//       .from('anomalies')
-//       .select('severity, status, type')
-//       .eq('status', 'open');
+/**
+ * 2. GET /api/admin/alerts/summary
+ * สรุปสถิติ Alert ที่ยังไม่ถูกแก้ไข (status = 'open') เพื่อนำไปแสดงใน Overview Cards
+ */
+router.get('/summary', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('anomalies')
+      .select('severity, status, type')
+      .eq('status', 'open');
 
-//     if (error) throw error;
+    if (error) throw error;
 
-//     const summary = {
-//       totalOpen: data.length,
-//       dangerCount: data.filter((item) => item.severity === 'danger').length,
-//       warningCount: data.filter((item) => item.severity === 'warning').length,
-//       mlAnomalyCount: data.filter((item) => item.type.includes('ML')).length, // ตรวจจับประเภทที่เป็น ML
-//     };
+    const summary = {
+      totalOpen: data.length,
+      dangerCount: data.filter((item) => item.severity === 'danger').length,
+      warningCount: data.filter((item) => item.severity === 'warning').length,
+      mlAnomalyCount: data.filter((item) => item.type.includes('ML')).length,
+    };
 
-//     return res.json({ success: true, summary });
-//   } catch (error) {
-//     console.error('Error in GET /api/admin/alerts/summary:', error);
-//     return res.status(500).json({ success: false, message: error.message });
-//   }
-// });
+    return res.json({ success: true, summary });
+  } catch (error) {
+    console.error('Error in GET /api/admin/alerts/summary:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
 
-// /**
-//  * 3. PATCH /api/admin/alerts/:id/status
-//  * อัปเดตสถานะ Alert (เช่น ปรับจาก 'open' เป็น 'resolved' หรือ 'acknowledged')
-//  */
-// router.patch('/:id/status', async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { status } = req.body; // รับค่า เช่น 'acknowledged' หรือ 'resolved'
+/**
+ * 3. PATCH /api/admin/alerts/:id/status
+ * อัปเดตสถานะ Alert (เช่น ปรับจาก 'open' เป็น 'resolved' หรือ 'acknowledged')
+ */
+router.patch('/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
 
-//     if (!status) {
-//       return res.status(400).json({ success: false, message: 'กรุณาระบุสถานะที่ต้องการเปลี่ยน' });
-//     }
+    if (!status) {
+      return res.status(400).json({ success: false, message: 'กรุณาระบุสถานะที่ต้องการเปลี่ยน' });
+    }
 
-//     const { data, error } = await supabase
-//       .from('anomalies')
-//       .update({ status })
-//       .eq('id', id)
-//       .select();
+    const { data, error } = await supabase
+      .from('anomalies')
+      .update({ status })
+      .eq('id', id)
+      .select();
 
-//     if (error) throw error;
+    if (error) throw error;
 
-//     return res.json({
-//       success: true,
-//       message: 'อัปเดตสถานะสำเร็จ',
-//       data: data[0],
-//     });
-//   } catch (error) {
-//     console.error('Error updating status in /api/admin/alerts:', error);
-//     return res.status(500).json({ success: false, message: error.message });
-//   }
-// });
+    return res.json({
+      success: true,
+      message: 'อัปเดตสถานะสำเร็จ',
+      data: data[0],
+    });
+  } catch (error) {
+    console.error('Error updating status in /api/admin/alerts:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
 
-// export default router;
+module.exports = router;

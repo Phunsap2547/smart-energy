@@ -24,13 +24,25 @@ export interface EnergyIngest {
   power_c?: number;
   energy_kwh?: number;
 
-  // Other Metrics
+  pf_a: number;            // Power Factor L1
+  pf_b: number;            // Power Factor L2
+  pf_c: number;            // Power Factor L3
   power_factor?: number;
+
+  // Other Metrics
   frequency_hz?: number;
   voltage_unbalance_pct?: number;
   current_unbalance_pct?: number;
+
   thd_voltage_l1_pct?: number;
+  thd_voltage_l2_pct?: number;
+  thd_voltage_l3_pct?: number;
+
   thd_current_l1_pct?: number;
+  thd_current_l2_pct?: number;
+  thd_current_l3_pct?: number;
+
+  daily_energy_kwh?: number | null;
 }
 
 // export interface EnergyIngest {

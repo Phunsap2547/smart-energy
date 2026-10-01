@@ -105,6 +105,27 @@ router.get('/', async (req, res) => {
   }
 });
 
+// // GET /api/readings/latest
+// router.get('/latest', async (req, res) => {
+//   const { device_id } = req.query;
+
+//   if (!device_id) {
+//     return res.status(400).json({ message: 'กรุณาระบุ device_id' });
+//   }
+
+//   try {
+//     const result = await pool.query(
+//       `SELECT * FROM energy_readings WHERE device_id = $1
+//        ORDER BY reading_time DESC LIMIT 1`,
+//       [device_id]
+//     );
+//     res.json(result.rows[0] || null);
+//   } catch (err) {
+//     console.error('❌ Error in GET /api/readings/latest:', err);
+//     res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ', error: err.message });
+//   }
+// });
+
 // GET /api/readings/latest
 router.get('/latest', async (req, res) => {
   const { device_id } = req.query;
@@ -114,118 +135,53 @@ router.get('/latest', async (req, res) => {
   }
 
   try {
-    const result = await pool.query(
+    // 1. ดึงข้อมูลล่าสุด (Latest Reading)
+    const latestResult = await pool.query(
       `SELECT * FROM energy_readings WHERE device_id = $1
        ORDER BY reading_time DESC LIMIT 1`,
       [device_id]
     );
-    res.json(result.rows[0] || null);
+
+    const latestReading = latestResult.rows[0];
+
+    if (!latestReading) {
+      return res.json(null);
+    }
+
+    // 2. หาวันเวลาเริ่มต้นของวันนี้ (00:00:00 น. เวลาไทย UTC+7)
+    const now = new Date();
+    const thaiDateStr = new Date(now.getTime() + (7 * 60 * 60 * 1000))
+      .toISOString()
+      .split('T')[0];
+    const startOfToday = `${thaiDateStr}T00:00:00`;
+
+    // 3. ดึงค่า energy_kwh แถวแรกสุดที่เกิดขึ้นตั้งแต่เที่ยงคืนของวันนี้
+    const startOfDayResult = await pool.query(
+      `SELECT energy_kwh FROM energy_readings
+       WHERE device_id = $1 AND reading_time >= $2
+       ORDER BY reading_time ASC LIMIT 1`,
+      [device_id, startOfToday]
+    );
+
+    // 4. คำนวณหน่วยไฟฟ้าที่ใช้ไปในวันนี้ (ลบค่า ณ เที่ยงคืน)
+    const currentEnergy = Number(latestReading.energy_kwh) || 0;
+    const startOfDayEnergy = startOfDayResult.rows[0]?.energy_kwh != null
+      ? Number(startOfDayResult.rows[0].energy_kwh)
+      : currentEnergy;
+
+    const dailyEnergyKwh = Math.max(0, currentEnergy - startOfDayEnergy);
+
+    // 5. ส่ง Response รวมค่าที่คำนวณเรียบร้อยแล้วกลับไป
+    res.json({
+      ...latestReading,
+      energy_start_of_day_kwh: startOfDayEnergy,
+      daily_energy_kwh: dailyEnergyKwh,
+    });
   } catch (err) {
     console.error('❌ Error in GET /api/readings/latest:', err);
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ', error: err.message });
   }
 });
-
-// // POST /api/readings
-// router.post('/', authenticateDevice, async (req, res) => {
-//   const {
-//     device_id, voltage_a, voltage_b, voltage_c,
-//     current_a, current_b, current_c,
-//     power_kw, energy_kwh, reading_time,
-//   } = req.body;
-
-//   if (!device_id) {
-//     return res.status(400).json({ message: 'กรุณาระบุ device_id' });
-//   }
-
-//   const client = await pool.connect();
-//   try {
-//     await client.query('BEGIN');
-
-//     // 1) เช็คว่า device มีอยู่จริง
-//     const deviceResult = await client.query(
-//       'SELECT id, building_id FROM devices WHERE id = $1',
-//       [device_id]
-//     );
-//     if (deviceResult.rows.length === 0) {
-//       await client.query('ROLLBACK');
-//       return res.status(404).json({ message: `ไม่พบ device_id: ${device_id} ในระบบ` });
-//     }
-//     const buildingId = deviceResult.rows[0].building_id;
-
-//     // 2) ค่าเฉลี่ยกระแสล่าสุด 5 รายการ
-//     const avgResult = await client.query(
-//       `SELECT AVG(GREATEST(current_a, current_b, current_c)) as avg_current
-//        FROM (
-//          SELECT current_a, current_b, current_c FROM energy_readings
-//          WHERE device_id = $1 ORDER BY reading_time DESC LIMIT 5
-//        ) recent`,
-//       [device_id]
-//     );
-//     const lastAvg = avgResult.rows[0].avg_current !== null ? Number(avgResult.rows[0].avg_current) : null;
-
-//     // 3) Insert reading (ปรับปรุงเวลาถ้าไม่ได้ส่งมาให้ใช้เวลาปัจจุบัน)
-//     const timeValue = reading_time || new Date();
-//     const insertResult = await client.query(
-//       `INSERT INTO energy_readings
-//         (device_id, reading_time, voltage_a, voltage_b, voltage_c, current_a, current_b, current_c, power_kw, energy_kwh)
-//        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-//        RETURNING *`,
-//       [device_id, timeValue, voltage_a, voltage_b, voltage_c, current_a, current_b, current_c, power_kw, energy_kwh]
-//     );
-//     const reading = insertResult.rows[0];
-
-//     // 4) Detect anomalies
-//     const anomaliesFound = detectAnomalies(req.body, lastAvg);
-//     const insertedAnomalies = [];
-//     for (const a of anomaliesFound) {
-//       const r = await client.query(
-//         `INSERT INTO anomalies (device_id, type, severity, description)
-//          VALUES ($1, $2, $3, $4) RETURNING *`,
-//         [device_id, a.type, a.severity, a.description]
-//       );
-//       insertedAnomalies.push(r.rows[0]);
-//     }
-
-//     // 5) คำนวณ status อาคาร
-//     const rankResult = await client.query(
-//       `SELECT COALESCE(MAX(
-//          CASE a.severity
-//            WHEN 'critical' THEN 3
-//            WHEN 'high' THEN 2
-//            ELSE 1
-//          END
-//        ), 0) as max_rank
-//        FROM anomalies a
-//        JOIN devices d ON d.id = a.device_id
-//        WHERE d.building_id = $1 AND a.status = 'open'`,
-//       [buildingId]
-//     );
-//     const maxRank = Number(rankResult.rows[0].max_rank);
-//     const newStatus = RANK_TO_BUILDING_STATUS[maxRank] || 'Normal';
-
-//     await client.query(
-//       'UPDATE buildings SET status = $1 WHERE id = $2',
-//       [newStatus, buildingId]
-//     );
-
-//     await client.query('COMMIT');
-
-//     res.status(201).json({
-//       reading,
-//       anomalies: insertedAnomalies,
-//       building_status: newStatus,
-//     });
-//   } catch (err) {
-//     await client.query('ROLLBACK');
-//     console.error('❌ Error in POST /api/readings:', err);
-//     res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ', error: err.message });
-//   } finally {
-//     client.release();
-//   }
-// });
-
-
 
 // POST /api/readings — เน้นบันทึกข้อมูลก่อนเพื่อสะสมให้ ML
 router.post('/', authenticateDevice, async (req, res) => {

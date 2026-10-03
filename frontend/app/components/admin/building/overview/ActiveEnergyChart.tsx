@@ -336,7 +336,7 @@
 //แผนภูมิแท่ง
 "use client";
 
-import React from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -346,40 +346,218 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { EnergyIngest } from "@/types/energy";
+import { supabase } from "@/lib/supabase";
 import { formatNumber } from "@/lib/formatter";
 
-type TimeFilter = "1D" | "7D" | "30D" | "12M";
+export type TimeFilter = "1D" | "7D" | "30D" | "12M";
 
 interface ActiveEnergyChartProps {
-  data: EnergyIngest[];
+  buildingId: string | number | null;
   filter: TimeFilter;
+  selectedDate?: string;
 }
 
-// แปลง Timestamp ให้เป็น Date Object ในโซนเวลาท้องถิ่น (Local Timezone)
-function parseDateSafe(raw: string | Date | number): Date {
-  if (raw instanceof Date) return raw;
-  if (typeof raw === "number") return new Date(raw);
-  if (!raw) return new Date();
-
-  let str = String(raw).trim();
-  if (str.includes(" ") && !str.includes("T")) {
-    str = str.replace(" ", "T");
-  }
-  const d = new Date(str);
-  return isNaN(d.getTime()) ? new Date() : d;
+interface ChartDataItem {
+  label: string;
+  energy: number;
+  cost: number;
 }
 
-// แปลง Date Object เป็น YYYY-MM-DD ตามเวลาท้องถิ่น
-function formatDateStr(d: Date): string {
+// แปลง Date Object เป็น YYYY-MM-DD
+const formatDateStr = (d: Date): string => {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
+};
 
-export default function ActiveEnergyChart({ data, filter }: ActiveEnergyChartProps) {
-  if (!data || data.length === 0) {
+// แกะชั่วโมงจาก Timestamp
+const extractHourFromTimestamp = (readingTimeStr: string): string => {
+  if (!readingTimeStr) return "00:00";
+  let timePart = "";
+  if (readingTimeStr.includes("T")) {
+    timePart = readingTimeStr.split("T")[1];
+  } else if (readingTimeStr.includes(" ")) {
+    timePart = readingTimeStr.split(" ")[1];
+  }
+  if (timePart) {
+    const hour = timePart.split(":")[0];
+    if (hour && !isNaN(Number(hour))) {
+      return `${String(Number(hour)).padStart(2, "0")}:00`;
+    }
+  }
+  return "00:00";
+};
+
+export default function ActiveEnergyChart({
+  buildingId,
+  filter,
+  selectedDate,
+}: ActiveEnergyChartProps) {
+  const [chartData, setChartData] = useState<ChartDataItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  const fetchChartData = useCallback(async () => {
+    if (!buildingId) return;
+
+    try {
+      setLoading(true);
+
+      // 1. ดึง Device IDs
+      const { data: devices, error: deviceError } = await supabase
+        .from("devices")
+        .select("id")
+        .eq("building_id", buildingId);
+
+      if (deviceError || !devices || devices.length === 0) {
+        setChartData([]);
+        return;
+      }
+
+      const deviceIds = devices.map((d) => d.id);
+
+      // 2. คำนวณช่วงเวลา Start - End แบบเดียวกับ DailyEnergyChart
+      const targetDateObj = selectedDate ? new Date(selectedDate) : new Date();
+      const endDateObj = new Date(targetDateObj);
+      const startDateObj = new Date(targetDateObj);
+
+      if (filter === "1D") {
+        // รายวัน
+        startDateObj.setHours(0, 0, 0, 0);
+      } else if (filter === "7D") {
+        startDateObj.setDate(targetDateObj.getDate() - 6);
+      } else if (filter === "30D") {
+        startDateObj.setDate(targetDateObj.getDate() - 29);
+      } else if (filter === "12M") {
+        startDateObj.setFullYear(targetDateObj.getFullYear() - 1);
+      }
+
+      const startDateStr = `${formatDateStr(startDateObj)} 00:00:00`;
+      const endDateStr = `${formatDateStr(endDateObj)} 23:59:59`;
+
+      // 3. ดึงข้อมูลแบบ Pagination Loop
+      let allReadings: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const from = page * pageSize;
+        const to = from + pageSize - 1;
+
+        const { data: batch, error: batchError } = await supabase
+          .from("energy_readings")
+          .select("reading_time, energy_kwh")
+          .in("device_id", deviceIds)
+          .gte("reading_time", startDateStr)
+          .lte("reading_time", endDateStr)
+          .order("reading_time", { ascending: true })
+          .range(from, to);
+
+        if (batchError || !batch || batch.length === 0) {
+          hasMore = false;
+        } else {
+          allReadings = [...allReadings, ...batch];
+          if (batch.length < pageSize) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        }
+      }
+
+      // 4. สร้าง Skeleton รอ
+      const groupedMap: {
+        [key: string]: {
+          min: number | null;
+          max: number | null;
+          label: string;
+        };
+      } = {};
+
+      if (filter === "1D") {
+        for (let h = 0; h < 24; h++) {
+          const hourStr = `${String(h).padStart(2, "0")}:00`;
+          groupedMap[hourStr] = { min: null, max: null, label: hourStr };
+        }
+      } else if (filter === "7D" || filter === "30D") {
+        const totalDays = filter === "7D" ? 7 : 30;
+        for (let i = totalDays - 1; i >= 0; i--) {
+          const d = new Date(targetDateObj);
+          d.setDate(d.getDate() - i);
+          const dateKey = formatDateStr(d);
+          const label = `${String(d.getDate()).padStart(2, "0")}/${String(
+            d.getMonth() + 1
+          ).padStart(2, "0")}`;
+          groupedMap[dateKey] = { min: null, max: null, label };
+        }
+      }
+
+      // 5. จัดกลุ่มข้อมูลลง groupedMap
+      allReadings.forEach((item) => {
+        if (item.energy_kwh === null || item.energy_kwh === undefined) return;
+
+        let groupKey = "";
+
+        if (filter === "1D") {
+          groupKey = extractHourFromTimestamp(item.reading_time);
+        } else {
+          const datePart = item.reading_time.replace("T", " ").split(" ")[0];
+          groupKey = datePart;
+        }
+
+        if (groupedMap[groupKey]) {
+          const val = Number(item.energy_kwh);
+          const currentMin = groupedMap[groupKey].min;
+          const currentMax = groupedMap[groupKey].max;
+
+          groupedMap[groupKey].min =
+            currentMin === null ? val : Math.min(currentMin, val);
+          groupedMap[groupKey].max =
+            currentMax === null ? val : Math.max(currentMax, val);
+        }
+      });
+
+      const ELECTRICITY_RATE = 4.3;
+
+      // 6. คำนวณพลังงาน (Max - Min)
+      const result: ChartDataItem[] = Object.keys(groupedMap)
+        .sort()
+        .map((key) => {
+          const item = groupedMap[key];
+          const diff =
+            item.max !== null && item.min !== null
+              ? Math.max(0, item.max - item.min)
+              : 0;
+          const energyKwh = Number(diff.toFixed(1));
+          return {
+            label: item.label,
+            energy: energyKwh,
+            cost: Number((energyKwh * ELECTRICITY_RATE).toFixed(2)),
+          };
+        });
+
+      setChartData(result);
+    } catch (err) {
+      console.error("Active energy chart fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [buildingId, filter, selectedDate]);
+
+  useEffect(() => {
+    fetchChartData();
+  }, [fetchChartData]);
+
+  if (loading) {
+    return (
+      <div className="h-48 flex items-center justify-center text-gray-400 text-sm">
+        กำลังโหลดข้อมูล...
+      </div>
+    );
+  }
+
+  if (!chartData || chartData.length === 0) {
     return (
       <div className="h-48 flex items-center justify-center text-gray-400 text-sm">
         ไม่มีข้อมูลสำหรับแสดงกราฟ
@@ -387,122 +565,26 @@ export default function ActiveEnergyChart({ data, filter }: ActiveEnergyChartPro
     );
   }
 
-  // 1. เรียงลำดับข้อมูลตามเวลาจริง (Local Time)
-  const sorted = [...data].sort((a, b) => {
-    const rawA = a.reading_time || a.created_at || "";
-    const rawB = b.reading_time || b.created_at || "";
-    return parseDateSafe(rawA).getTime() - parseDateSafe(rawB).getTime();
-  });
-
-  // 2. ถ้าเป็น 1D ดึงเฉพาะข้อมูลของวันที่ล่าสุด (ตามโซนเวลาท้องถิ่น)
-  let targetData = sorted;
-  if (filter === "1D" && sorted.length > 0) {
-    const lastItem = sorted[sorted.length - 1];
-    const lastRaw = lastItem.reading_time || lastItem.created_at || "";
-    const targetDateStr = formatDateStr(parseDateSafe(lastRaw));
-
-    targetData = sorted.filter((item) => {
-      const raw = item.reading_time || item.created_at || "";
-      return formatDateStr(parseDateSafe(raw)) === targetDateStr;
-    });
-  }
-
-  // 3. จัดกลุ่มข้อมูล (Grouping)
-  const groupMap = new Map<
-    string,
-    { label: string; min: number | null; max: number | null; sortTime: number }
-  >();
-
-  // เตรียม Skeleton สำหรับ 1D ให้ครบ 24 ชั่วโมง (00:00 - 23:00)
-  if (filter === "1D") {
-    for (let h = 0; h < 24; h++) {
-      const hStr = `${String(h).padStart(2, "0")}:00`;
-      groupMap.set(hStr, { label: hStr, min: null, max: null, sortTime: h });
-    }
-  }
-
-  for (const item of targetData) {
-    const raw = item.reading_time || item.created_at;
-    if (!raw) continue;
-
-    const val = Number(item.energy_kwh ?? item.power_kw ?? 0);
-    if (isNaN(val) || val < 0) continue;
-
-    const fullDate = parseDateSafe(raw);
-    const dateStr = formatDateStr(fullDate);
-    const hourStr = `${String(fullDate.getHours()).padStart(2, "0")}:00`;
-    const monthStr = `${fullDate.getFullYear()}-${String(fullDate.getMonth() + 1).padStart(2, "0")}`;
-
-    let key = "";
-    let label = "";
-
-    if (filter === "1D") {
-      key = hourStr;
-      label = hourStr;
-    } else if (filter === "7D" || filter === "30D") {
-      key = dateStr;
-      label = `${String(fullDate.getDate()).padStart(2, "0")}/${String(fullDate.getMonth() + 1).padStart(2, "0")}`;
-    } else if (filter === "12M") {
-      key = monthStr;
-      label = fullDate.toLocaleDateString("th-TH", { month: "short", year: "2-digit" });
-    }
-
-    if (!groupMap.has(key)) {
-      groupMap.set(key, {
-        label,
-        min: val,
-        max: val,
-        sortTime: fullDate.getTime(),
-      });
-    } else {
-      const current = groupMap.get(key)!;
-      groupMap.set(key, {
-        ...current,
-        min: current.min === null ? val : Math.min(current.min, val),
-        max: current.max === null ? val : Math.max(current.max, val),
-      });
-    }
-  }
-
-  const ELECTRICITY_RATE = 4.3; // อัตราค่าไฟเฉลี่ย 4.3 บาท/หน่วย
-
-  // 4. คำนวณพลังงานไฟฟ้าที่ใช้จริง (Max - Min)
-  const chartData = Array.from(groupMap.values())
-    .sort((a, b) => a.sortTime - b.sortTime)
-    .map((item) => {
-      const diff =
-        item.max !== null && item.min !== null ? Math.max(0, item.max - item.min) : 0;
-      const energyKwh = Number(diff.toFixed(2));
-      return {
-        time: item.label,
-        energy: energyKwh,
-        cost: Number((energyKwh * ELECTRICITY_RATE).toFixed(2)),
-      };
-    });
-
   return (
     <div className="h-48 w-full pt-2">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-
           <XAxis
-            dataKey="time"
+            dataKey="label"
             tickLine={false}
             axisLine={false}
             tick={{ fontSize: 10, fill: "#9ca3af" }}
             interval={filter === "1D" ? 0 : "preserveStartEnd"}
           />
-
           <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#9ca3af" }} />
-
           <Tooltip
             content={({ active, payload }) => {
               if (active && payload && payload.length) {
                 const energy = Number(payload[0].value ?? 0);
                 return (
                   <div className="bg-gray-900 text-white p-2.5 rounded-lg shadow-md text-xs space-y-1">
-                    <p className="font-medium text-gray-300">{payload[0].payload.time}</p>
+                    <p className="font-medium text-gray-300">{payload[0].payload.label}</p>
                     <p className="text-emerald-400 font-semibold">
                       Energy: {formatNumber(energy, 1)} kWh
                     </p>
@@ -512,12 +594,7 @@ export default function ActiveEnergyChart({ data, filter }: ActiveEnergyChartPro
               return null;
             }}
           />
-
-          <Bar
-            dataKey="energy"
-            fill="#10b981"
-            radius={[4, 4, 0, 0]}
-          />
+          <Bar dataKey="energy" fill="#10b981" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

@@ -53,207 +53,50 @@
 //   }
 // });
 
-// module.exports = router;
-// import express from 'express';
-// import { supabase } from '../supabase.js'; // ปรับ path ตามไฟล์ supabase.js ของคุณ
+const express = require('express');
+const supabase = require('../supabase');
 
-// const router = express.Router();
-
-// /**
-//  * 1. GET /api/admin/alerts
-//  * ดึงรายการแจ้งเตือนทั้งหมดในระบบสำหรับ Admin (รองรับการกรองตามสถานะ/ความรุนแรง)
-//  */
-// router.get('/', async (req, res) => {
-//   try {
-//     const { status = 'PENDING', severity, buildingId } = req.query;
-
-//     let query = supabase
-//       .from('alerts')
-//       .select(`
-//         id,
-//         type,
-//         severity,
-//         title,
-//         message,
-//         anomaly_score,
-//         status,
-//         created_at,
-//         building_id,
-//         buildings ( name ),
-//         device_id,
-//         devices ( name )
-//       `)
-//       .order('created_at', { ascending: false });
-
-//     // Filter ตาม Parameter ที่ส่งมาจาก Frontend
-//     if (status !== 'ALL') {
-//       query = query.eq('status', status);
-//     }
-//     if (severity) {
-//       query = query.eq('severity', severity);
-//     }
-//     if (buildingId) {
-//       query = query.eq('building_id', buildingId);
-//     }
-
-//     const { data, error } = await query;
-
-//     if (error) throw error;
-
-//     return res.json({
-//       success: true,
-//       count: data.length,
-//       data,
-//     });
-//   } catch (error) {
-//     console.error('Error in GET /admin/alerts:', error);
-//     return res.status(500).json({ success: false, message: error.message });
-//   }
-// });
-
-// /**
-//  * 2. GET /api/admin/alerts/summary
-//  * สรุปจำนวน Alert สำหรับแสดงผลบน Card บน Admin Dashboard
-//  */
-// router.get('/summary', async (req, res) => {
-//   try {
-//     const { data: alerts, error } = await supabase
-//       .from('alerts')
-//       .select('severity, status, type')
-//       .eq('status', 'PENDING');
-
-//     if (error) throw error;
-
-//     const summary = {
-//       totalPending: alerts.length,
-//       dangerCount: alerts.filter((a) => a.severity === 'danger').length,
-//       warningCount: alerts.filter((a) => a.severity === 'warning').length,
-//       mlAnomalyCount: alerts.filter((a) => a.type === 'ML_ANOMALY').length, // เคสที่มาจาก ML
-//     };
-
-//     return res.json({ success: true, summary });
-//   } catch (error) {
-//     console.error('Error in GET /admin/alerts/summary:', error);
-//     return res.status(500).json({ success: false, message: error.message });
-//   }
-// });
-
-// /**
-//  * 3. PATCH /api/admin/alerts/:id/status
-//  * อัปเดตสถานะการแจ้งเตือน (เช่น Admin กด Resolve ปิดเคส)
-//  */
-// router.patch('/:id/status', async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { status } = req.body; // รับค่า 'ACKNOWLEDGED' หรือ 'RESOLVED'
-
-//     if (!['PENDING', 'ACKNOWLEDGED', 'RESOLVED'].includes(status)) {
-//       return res.status(400).json({ success: false, message: 'Invalid status value' });
-//     }
-
-//     const { data, error } = await supabase
-//       .from('alerts')
-//       .update({ status, updated_at: new Date().toISOString() })
-//       .eq('id', id)
-//       .select();
-
-//     if (error) throw error;
-
-//     return res.json({
-//       success: true,
-//       message: 'อัปเดตสถานะสำเร็จ',
-//       data: data[0],
-//     });
-//   } catch (error) {
-//     console.error('Error updating alert status:', error);
-//     return res.status(500).json({ success: false, message: error.message });
-//   }
-// });
-
-// export default router;
-// alerts.js
-import { supabase } from '@/lib/supabase'; // ปรับ path ตามโครงสร้างโปรเจกต์
+const router = express.Router();
 
 /**
- * ตรวจสอบสถานะการส่งข้อมูลของอุปกรณ์ในอาคาร
- * @param {string} buildingId - ID ของอาคาร
- * @returns {Promise<Array>} รายการแจ้งเตือนทั้งหมด
+ * GET /api/alerts
+ * ดึงรายการ Alert/Anomaly สำหรับหน้า Public หรือ Dashboard ทั่วไป
  */
-export async function checkBuildingAlerts(buildingId) {
+router.get('/', async (req, res) => {
   try {
-    if (!buildingId) return [];
+    const { device_id, type, status, limit = 50 } = req.query;
 
-    // 1. ดึงอุปกรณ์ทั้งหมดในอาคาร
-    const { data: devices, error: deviceError } = await supabase
-      .from('devices')
-      .select('id, name')
-      .eq('building_id', buildingId);
+    let query = supabase
+      .from('anomalies')
+      .select(`
+        id,
+        device_id,
+        type,
+        severity,
+        description,
+        status,
+        created_at,
+        devices ( name )
+      `)
+      .order('created_at', { ascending: false })
+      .limit(parseInt(limit, 10));
 
-    if (deviceError || !devices || devices.length === 0) {
-      return [];
-    }
+    if (device_id) query = query.eq('device_id', device_id);
+    if (type) query = query.eq('type', type);
+    if (status) query = query.eq('status', status);
 
-    const alerts = [];
-    const now = new Date().getTime();
+    const { data, error } = await query;
 
-    for (const device of devices) {
-      // 2. ดึงข้อมูลล่าสุด 1 Record ของอุปกรณ์ชิ้นนี้
-      const { data: latestReadings, error: readingError } = await supabase
-        .from('energy_readings')
-        .select('reading_time, energy_kwh')
-        .eq('device_id', device.id)
-        .order('reading_time', { ascending: false })
-        .limit(1);
+    if (error) throw error;
 
-      if (readingError || !latestReadings || latestReadings.length === 0) {
-        alerts.push({
-          id: `no-data-${device.id}`,
-          deviceId: device.id,
-          type: 'NO_DATA',
-          severity: 'warning',
-          title: 'ไม่พบข้อมูลการใช้งาน',
-          message: `อุปกรณ์ ${device.name} ยังไม่มีการบันทึกข้อมูลในระบบ`,
-        });
-        continue;
-      }
-
-      const lastReading = latestReadings[0];
-      
-      // แปลง Timestamp (รองรับทั้ง UTC/Z)
-      let rawTime = String(lastReading.reading_time).trim();
-      if (rawTime.includes(' ') && !rawTime.includes('T')) {
-        rawTime = rawTime.replace(' ', 'T');
-      }
-      if (!rawTime.endsWith('Z') && !rawTime.includes('+') && !rawTime.includes('-', 10)) {
-        rawTime += 'Z';
-      }
-
-      const lastTime = new Date(rawTime).getTime();
-      const diffMinutes = Math.floor((now - lastTime) / (1000 * 60));
-
-      // 3. เงื่อนไข: ถ้าขาดข้อมูลเกิน 15 นาที
-      if (diffMinutes >= 15) {
-        const lastTimeFormatted = new Date(lastTime).toLocaleTimeString('th-TH', {
-          hour: '2-digit',
-          minute: '2-digit',
-        });
-
-        alerts.push({
-          id: `power-outage-${device.id}`,
-          deviceId: device.id,
-          type: 'POWER_OUTAGE',
-          severity: 'danger', // สีแดง
-          title: 'คาดว่าไฟดับ / อุปกรณ์ Offline',
-          message: `ขาดการติดต่อเกิน ${diffMinutes} นาที (อัปเดตล่าสุดเวลา ${lastTimeFormatted} น.)`,
-          lastSeen: lastReading.reading_time,
-          diffMinutes,
-        });
-      }
-    }
-
-    return alerts;
+    return res.json({
+      success: true,
+      data: data || [],
+    });
   } catch (error) {
-    console.error('Error checking building alerts:', error);
-    return [];
+    console.error('Error fetching alerts:', error);
+    return res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดในระบบ' });
   }
-}
+});
+
+module.exports = router;

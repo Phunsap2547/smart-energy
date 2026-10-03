@@ -137,7 +137,7 @@ const adminRoutes = require('./routes/admin');
 const adminBuildingsRoutes = require('./routes/adminBuildings');
 const adminDevicesRoutes = require('./routes/adminDevices');
 const adminAlertsRoutes = require('./routes/adminAlerts');
-const adminUploadRoute = require('./routes/adminUpload');
+//const adminUploadRoute = require('./routes/adminUpload');
 
 // Routes สำหรับ IoT pipeline / โมเดล ML
 const ingestRoutes = require('./routes/ingest');
@@ -162,7 +162,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/admin/buildings', adminBuildingsRoutes);
 app.use('/api/admin/devices', adminDevicesRoutes);
 app.use('/api/admin/alerts', adminAlertsRoutes);
-app.use('/api/admin/upload', adminUploadRoute); 
+//app.use('/api/admin/upload', adminUploadRoute); 
 
 // Ingest APIs
 app.use('/api/ingest', ingestRoutes);

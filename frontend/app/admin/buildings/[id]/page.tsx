@@ -751,34 +751,27 @@
 //   );
 // }
 
+'use client';
 
-"use client";
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useParams } from 'next/navigation';
+import { Zap, Activity, Gauge, Radio, TrendingUp } from 'lucide-react';
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { useParams } from "next/navigation";
-import {
-  AlertTriangle,
-  Zap,
-  Activity,
-  Gauge,
-  Radio,
-  ChevronRight,
-  TrendingUp,
-} from "lucide-react";
+import OverviewCard from '@/components/admin/building/overview/OverviewCard';
+import ActiveEnergyChart from '@/components/admin/building/overview/ActiveEnergyChart';
+import PhaseTable from '@/components/admin/building/overview/PhaseTable';
+import THDChart from '@/components/admin/building/overview/THDChart';
 
-import OverviewCard from "@/components/admin/building/overview/OverviewCard";
-import ActiveEnergyChart from "@/components/admin/building/overview/ActiveEnergyChart";
-import PhaseTable from "@/components/admin/building/overview/PhaseTable";
-import THDChart from "@/components/admin/building/overview/THDChart";
+import BuildingSidebar from '@/components/admin/building/shared/BuildingSidebar';
+import RealtimeClock from '@/components/admin/building/shared/RealtimeClock';
+import StatusAlertBanners from '@/components/admin/building/alerts/StatusAlertBanners';
 
-import BuildingSidebar from "@/components/admin/building/shared/BuildingSidebar";
-import RealtimeClock from "@/components/admin/building/shared/RealtimeClock";
+import { supabase } from '@/lib/supabase';
+import { EnergyIngest } from '@/types/energy';
+import { formatNumber } from '@/lib/formatter';
+import { useDeviceStatus } from '@/hooks/useDeviceStatus';
 
-import { supabase } from "@/lib/supabase";
-import { EnergyIngest } from "@/types/energy";
-import { formatNumber } from "@/lib/formatter";
-
-export type TimeFilter = "1D" | "7D" | "30D" | "12M";
+export type TimeFilter = '1D' | '7D' | '30D' | '12M';
 
 export default function BuildingOverviewPage() {
   const params = useParams();
@@ -786,22 +779,22 @@ export default function BuildingOverviewPage() {
 
   const [ingestData, setIngestData] = useState<EnergyIngest[]>([]);
   const [latestData, setLatestData] = useState<EnergyIngest | null>(null);
-
-  // ✅ เก็บค่ามิเตอร์สะสม ณ เที่ยงคืน (00:00 น.) ของวันนี้
   const [startOfDayEnergy, setStartOfDayEnergy] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('1D');
 
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>("1D");
+  // ⚡ เรียกใช้ Hook จัดการสถานะ Realtime / Offline
+  const status = useDeviceStatus(latestData);
+  const { isOffline, voltage, current, pf, freq, isVoltageAnomaly, isCurrentAnomaly, isPfAnomaly, isFreqAnomaly } = status;
 
   const fetchIngestData = useCallback(async () => {
     if (!buildingId) return;
 
     try {
-      // 1. ดึง device_id
       const { data: devices, error: deviceError } = await supabase
-        .from("devices")
-        .select("id")
-        .eq("building_id", buildingId);
+        .from('devices')
+        .select('id')
+        .eq('building_id', buildingId);
 
       if (deviceError || !devices || devices.length === 0) {
         setIngestData([]);
@@ -812,12 +805,11 @@ export default function BuildingOverviewPage() {
 
       const deviceIds = devices.map((d) => d.id);
 
-      // 2. ดึงข้อมูลล่าสุด
       const { data: latestRow } = await supabase
-        .from("energy_readings")
-        .select("*")
-        .in("device_id", deviceIds)
-        .order("reading_time", { ascending: false })
+        .from('energy_readings')
+        .select('*')
+        .in('device_id', deviceIds)
+        .order('reading_time', { ascending: false })
         .limit(1)
         .maybeSingle();
 
@@ -825,16 +817,15 @@ export default function BuildingOverviewPage() {
         setLatestData(latestRow);
       }
 
-      // 3. ดึงค่ามิเตอร์สะสมแถวแรกสุดของวันนี้ (00:00 น.)
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
 
       const { data: firstRowToday } = await supabase
-        .from("energy_readings")
-        .select("energy_kwh")
-        .in("device_id", deviceIds)
-        .gte("reading_time", startOfDay.toISOString())
-        .order("reading_time", { ascending: true })
+        .from('energy_readings')
+        .select('energy_kwh')
+        .in('device_id', deviceIds)
+        .gte('reading_time', startOfDay.toISOString())
+        .order('reading_time', { ascending: true })
         .limit(1)
         .maybeSingle();
 
@@ -842,34 +833,27 @@ export default function BuildingOverviewPage() {
         setStartOfDayEnergy(Number(firstRowToday.energy_kwh));
       }
 
-      // 4. ช่วงเวลาสำหรับดึงข้อมูลทำกราฟ
       const now = new Date();
       let startDate = new Date();
 
-      if (timeFilter === "1D") {
-        startDate.setHours(0, 0, 0, 0);
-      } else if (timeFilter === "7D") {
-        startDate.setDate(now.getDate() - 7);
-      } else if (timeFilter === "30D") {
-        startDate.setDate(now.getDate() - 30);
-      } else if (timeFilter === "12M") {
-        startDate.setFullYear(now.getFullYear() - 1);
-      }
+      if (timeFilter === '1D') startDate.setHours(0, 0, 0, 0);
+      else if (timeFilter === '7D') startDate.setDate(now.getDate() - 7);
+      else if (timeFilter === '30D') startDate.setDate(now.getDate() - 30);
+      else if (timeFilter === '12M') startDate.setFullYear(now.getFullYear() - 1);
 
-      // 5. Query ข้อมูลทำกราฟ
       const { data, error } = await supabase
-        .from("energy_readings")
-        .select("*")
-        .in("device_id", deviceIds)
-        .gte("reading_time", startDate.toISOString())
-        .order("reading_time", { ascending: false })
+        .from('energy_readings')
+        .select('*')
+        .in('device_id', deviceIds)
+        .gte('reading_time', startDate.toISOString())
+        .order('reading_time', { ascending: false })
         .limit(1000);
 
       if (!error && data) {
         setIngestData([...data].reverse());
       }
     } catch (err) {
-      console.error("Fetch error:", err);
+      console.error('Fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -881,12 +865,8 @@ export default function BuildingOverviewPage() {
     const channel = supabase
       .channel(`energy_readings_b${buildingId}`)
       .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "energy_readings",
-        },
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'energy_readings' },
         () => fetchIngestData()
       )
       .subscribe();
@@ -899,79 +879,28 @@ export default function BuildingOverviewPage() {
     };
   }, [buildingId, fetchIngestData]);
 
-  // ----------------------------------------------------
-  // ⚡ LOGIC ตรวจสอบสถานะ REALTIME / OFFLINE (> 15 นาที)
-  // ----------------------------------------------------
-  const rawTime = latestData?.reading_time || latestData?.created_at;
-  const lastDate = rawTime ? new Date(rawTime) : null;
-  const now = new Date();
-
-  // คำนวณระยะห่างเวลาเป็นนาที
-  const diffMinutes = lastDate && !isNaN(lastDate.getTime())
-    ? Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60))
-    : 999;
-
-  // ขาดสัญญาณเกิน 15 นาทีถือเป็น Offline
-  const isOffline = !latestData || diffMinutes >= 15;
-
-  const lastTimeString = lastDate && !isNaN(lastDate.getTime())
-    ? lastDate.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น."
-    : "-";
-
-  const displayTimeDiff = diffMinutes >= 60
-    ? `${Math.floor(diffMinutes / 60)} ชม. ${diffMinutes % 60} นาที`
-    : `${diffMinutes} นาที`;
-
-  // ----------------------------------------------------
-  // 📊 ค่าแสดงผลบน Dashboard (ตัดเป็น 0 ทั้งหมดถ้า Offline)
-  // ----------------------------------------------------
-  const voltage = isOffline ? 0 : (latestData?.voltage_system ?? 0);
-  const current = isOffline ? 0 : (latestData?.current_system ?? 0);
-  const pf = isOffline ? 0 : (latestData?.power_factor ?? 0);
-  const freq = isOffline ? 0 : (latestData?.frequency_hz ?? 0);
-
-  // ข้อมูลสำหรับ PhaseTable (ถ้า Offline ให้เซ็ตค่าเฟสทั้งหมดเป็น 0)
   const displayLatest = useMemo(() => {
     if (!latestData || isOffline) {
       return {
         ...latestData,
-        voltage_system: 0,
-        current_system: 0,
-        power_factor: 0,
-        frequency_hz: 0,
+        voltage_system: 0, current_system: 0, power_factor: 0, frequency_hz: 0,
         voltage_l1: 0, voltage_l2: 0, voltage_l3: 0,
         current_l1: 0, current_l2: 0, current_l3: 0,
         pf_l1: 0, pf_l2: 0, pf_l3: 0,
-        thd_voltage_l1_pct: 0,
-        thd_current_l1_pct: 0,
+        thd_voltage_l1_pct: 0, thd_current_l1_pct: 0,
       } as EnergyIngest;
     }
     return latestData;
   }, [latestData, isOffline]);
 
-  // คำนวณความผิดปกติทางไฟฟ้า (เช็กเฉพาะเมื่อ Online)
-  const isVoltageAnomaly = !isOffline && (voltage < 380 || voltage > 440);
-  const isCurrentAnomaly = !isOffline && (current >= 100);
-  const isPfAnomaly = !isOffline && (pf < 0.8);
-  const isFreqAnomaly = !isOffline && (freq < 49 || freq > 51);
-
-  const hasAnyAnomaly = isVoltageAnomaly || isCurrentAnomaly || isPfAnomaly || isFreqAnomaly;
-
-  // คำนวณหน่วยไฟช่วงเวลา
   const periodEnergyKwh = useMemo(() => {
-    if (timeFilter === "1D" && latestData?.energy_kwh != null && startOfDayEnergy != null) {
+    if (timeFilter === '1D' && latestData?.energy_kwh != null && startOfDayEnergy != null) {
       const diff = Number(latestData.energy_kwh) - startOfDayEnergy;
       return Math.max(0, diff);
     }
-
     if (!ingestData || ingestData.length === 0) return 0;
-
-    const values = ingestData
-      .map((item) => Number(item.energy_kwh ?? 0))
-      .filter((v) => v > 0);
-
+    const values = ingestData.map((item) => Number(item.energy_kwh ?? 0)).filter((v) => v > 0);
     if (values.length === 0) return 0;
-
     return Math.max(...values) - Math.min(...values);
   }, [ingestData, timeFilter, latestData, startOfDayEnergy]);
 
@@ -994,68 +923,27 @@ export default function BuildingOverviewPage() {
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-bold text-gray-900">ภาพรวมระบบ</h1>
                 <span
-                  className={`text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 ${isOffline
-                    ? "bg-red-100 text-red-700 animate-pulse"
-                    : "bg-emerald-100 text-emerald-700"
-                    }`}
+                  className={`text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 ${
+                    isOffline
+                      ? 'bg-red-100 text-red-700 animate-pulse'
+                      : 'bg-emerald-100 text-emerald-700'
+                  }`}
                 >
                   <span
-                    className={`w-2 h-2 rounded-full ${isOffline ? "bg-red-500" : "bg-emerald-500"
-                      }`}
+                    className={`w-2 h-2 rounded-full ${
+                      isOffline ? 'bg-red-500' : 'bg-emerald-500'
+                    }`}
                   />
-                  {isOffline ? "Offline" : "Realtime Online"}
+                  {isOffline ? 'Offline' : 'Realtime Online'}
                 </span>
               </div>
-              <p className="text-sm text-gray-500 mt-1">
-                สรุปสถานะระบบไฟฟ้าแบบ Real-time
-              </p>
+              <p className="text-sm text-gray-500 mt-1">สรุปสถานะระบบไฟฟ้าแบบ Real-time</p>
             </div>
             <RealtimeClock />
           </div>
 
-          {/* ⚡ BANNER แจ้งเตือนกรณี OFFLINE / สัญญาณขาดหายเกิน 15 นาที */}
-          {isOffline && (
-            <div className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-xl text-red-900 shadow-sm">
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="text-red-600 shrink-0" size={22} />
-                <div>
-                  <h4 className="font-bold text-sm text-red-800">
-                    ⚡ คาดว่าระบบไฟดับ / สัญญาณขาดหาย (Offline)
-                  </h4>
-                  <p className="text-xs text-red-700 mt-0.5">
-                    ไม่ได้รับข้อมูลส่งเข้ามานานเกิน {displayTimeDiff} (อัปเดตล่าสุดเมื่อ {lastTimeString})
-                  </p>
-                </div>
-              </div>
-              <span className="text-xs font-semibold px-3 py-1 bg-red-100 text-red-700 rounded-lg shrink-0">
-                ระบบถูกปรับค่ากระแสเป็น 0 A
-              </span>
-            </div>
-          )}
-
-          {/* BANNER แจ้งเตือนค่าไฟฟ้าผิดปกติ (กรณี Online) */}
-          {!isOffline && hasAnyAnomaly && (
-            <div className="flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 shadow-sm">
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="text-amber-600 shrink-0" size={20} />
-                <span className="font-medium text-sm">
-                  พบค่าความผิดปกติในระบบไฟฟ้า —{" "}
-                  {isPfAnomaly &&
-                    `Power factor รวมต่ำ (${formatNumber(pf, 2)}) `}
-                  {isVoltageAnomaly &&
-                    `แรงดันไม่อยู่ในช่วง 380-440V (${formatNumber(voltage, 1)}V) `}
-                  {isCurrentAnomaly &&
-                    `กระแสเกินเกณฑ์ (${formatNumber(current, 1)}A) `}
-                  {isFreqAnomaly &&
-                    `ความถี่ไม่อยู่ในช่วง 49-51Hz (${formatNumber(freq, 1)}Hz) `}
-                  — ควรตรวจสอบโหลด
-                </span>
-              </div>
-              <button className="flex items-center gap-1 text-sm font-medium text-amber-700 hover:text-amber-800 transition">
-                ดูรายละเอียดเพิ่มเติม <ChevronRight size={16} />
-              </button>
-            </div>
-          )}
+          {/* ⚡ Banners การแจ้งเตือนไฟดับ / ค่าไฟฟ้าผิดปกติ */}
+          <StatusAlertBanners status={status} />
 
           {/* OVERVIEW CARDS */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1063,73 +951,44 @@ export default function BuildingOverviewPage() {
               title="System voltage"
               value={formatNumber(voltage, 1)}
               unit="V"
-              subtitle={isOffline ? `สัญญาณขาดหายตั้งแต่ ${lastTimeString}` : "แรงดันระบบ"}
-              statusLabel={isOffline ? "Offline" : isVoltageAnomaly ? "ผิดปกติ" : "ปกติ"}
+              subtitle="แรงดันระบบ"
+              statusLabel={isOffline ? 'Offline' : isVoltageAnomaly ? 'ผิดปกติ' : 'ปกติ'}
               statusRange="ช่วงปกติ 380 - 440 V"
               isError={isOffline || isVoltageAnomaly}
-              borderColor={isOffline ? "#ef4444" : "#3b82f6"}
-              icon={
-                <Zap
-                  size={20}
-                  className={
-                    isOffline || isVoltageAnomaly ? "text-red-600" : "text-emerald-600"
-                  }
-                />
-              }
+              borderColor={isOffline ? '#ef4444' : '#3b82f6'}
+              icon={<Zap size={20} className={isOffline || isVoltageAnomaly ? 'text-red-600' : 'text-emerald-600'} />}
             />
-
             <OverviewCard
               title="System current"
               value={formatNumber(current, 2)}
               unit="A"
-              subtitle={isOffline ? `สัญญาณขาดหายตั้งแต่ ${lastTimeString}` : "กระแสรวม"}
-              statusLabel={isOffline ? "Offline" : isCurrentAnomaly ? "ผิดปกติ" : "ปกติ"}
+              subtitle="กระแสรวม"
+              statusLabel={isOffline ? 'Offline' : isCurrentAnomaly ? 'ผิดปกติ' : 'ปกติ'}
               statusRange="ช่วงปกติ < 100 A"
               isError={isOffline || isCurrentAnomaly}
-              borderColor={isOffline ? "#ef4444" : "#3b82f6"}
-              icon={
-                <Activity
-                  size={20}
-                  className={
-                    isOffline || isCurrentAnomaly ? "text-red-600" : "text-emerald-600"
-                  }
-                />
-              }
+              borderColor={isOffline ? '#ef4444' : '#3b82f6'}
+              icon={<Activity size={20} className={isOffline || isCurrentAnomaly ? 'text-red-600' : 'text-emerald-600'} />}
             />
-
             <OverviewCard
               title="Total power factor"
               value={formatNumber(pf, 2)}
-              subtitle={isOffline ? `สัญญาณขาดหายตั้งแต่ ${lastTimeString}` : "เพาเวอร์แฟคเตอร์รวม"}
-              statusLabel={isOffline ? "Offline" : isPfAnomaly ? "ผิดปกติ" : "ปกติ"}
+              subtitle="เพาเวอร์แฟคเตอร์รวม"
+              statusLabel={isOffline ? 'Offline' : isPfAnomaly ? 'ผิดปกติ' : 'ปกติ'}
               statusRange="เกณฑ์ปกติ ≥ 0.80"
               isError={isOffline || isPfAnomaly}
-              borderColor={isOffline ? "#ef4444" : "#3b82f6"}
-              icon={
-                <Gauge
-                  size={20}
-                  className={isOffline || isPfAnomaly ? "text-red-600" : "text-emerald-600"}
-                />
-              }
+              borderColor={isOffline ? '#ef4444' : '#3b82f6'}
+              icon={<Gauge size={20} className={isOffline || isPfAnomaly ? 'text-red-600' : 'text-emerald-600'} />}
             />
-
             <OverviewCard
               title="Frequency"
               value={formatNumber(freq, 1)}
               unit="Hz"
-              subtitle={isOffline ? `สัญญาณขาดหายตั้งแต่ ${lastTimeString}` : "ความถี่"}
-              statusLabel={isOffline ? "Offline" : isFreqAnomaly ? "ผิดปกติ" : "ปกติ"}
+              subtitle="ความถี่"
+              statusLabel={isOffline ? 'Offline' : isFreqAnomaly ? 'ผิดปกติ' : 'ปกติ'}
               statusRange="ช่วงปกติ 49 - 51 Hz"
               isError={isOffline || isFreqAnomaly}
-              borderColor={isOffline ? "#ef4444" : "#3b82f6"}
-              icon={
-                <Radio
-                  size={20}
-                  className={
-                    isOffline || isFreqAnomaly ? "text-red-600" : "text-emerald-600"
-                  }
-                />
-              }
+              borderColor={isOffline ? '#ef4444' : '#3b82f6'}
+              icon={<Radio size={20} className={isOffline || isFreqAnomaly ? 'text-red-600' : 'text-emerald-600'} />}
             />
           </div>
 
@@ -1139,47 +998,36 @@ export default function BuildingOverviewPage() {
           </div>
 
           {/* CHARTS */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-xl p-5 border border-gray-200 shadow-sm space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm space-y-4">
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-sm font-medium text-gray-500">
-                    {timeFilter === "1D"
-                      ? "การใช้ไฟฟ้าวันนี้"
-                      : `การใช้ไฟฟ้าช่วง ${timeFilter}`}
+                    {timeFilter === '1D' ? 'การใช้ไฟฟ้าวันนี้' : `การใช้ไฟฟ้าช่วง ${timeFilter}`}
                   </p>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-2xl font-bold text-gray-900">
-                      {formatNumber(periodEnergyKwh, 1)}
-                    </span>
-                    <span className="text-sm text-gray-500 font-medium">
-                      kWh
-                    </span>
+                    <span className="text-2xl font-bold text-gray-900">{formatNumber(periodEnergyKwh, 1)}</span>
+                    <span className="text-sm text-gray-500 font-medium">kWh</span>
                   </div>
                   <p className="text-xs text-emerald-600 font-medium flex items-center gap-1 mt-1">
-                    <TrendingUp size={14} /> มิเตอร์สะสมรวม:{" "}
-                    {formatNumber(latestData?.energy_kwh ?? 0, 0)} kWh
+                    <TrendingUp size={14} /> มิเตอร์สะสมรวม: {formatNumber(latestData?.energy_kwh ?? 0, 0)} kWh
                   </p>
                 </div>
               </div>
-              <ActiveEnergyChart data={ingestData} filter={timeFilter} />
+              <ActiveEnergyChart buildingId={buildingId} filter={timeFilter} />
             </div>
 
-            <div className="lg:col-span-1 bg-white rounded-xl p-5 border border-gray-200 shadow-sm space-y-4">
+            <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm space-y-4">
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="text-sm font-medium text-gray-500">
-                    THD voltage (L1)
-                  </p>
+                  <p className="text-sm font-medium text-gray-500">THD voltage (L1)</p>
                   <div className="flex items-baseline gap-1 mt-1">
                     <span className="text-2xl font-bold text-gray-900">
                       {formatNumber(displayLatest?.thd_voltage_l1_pct ?? 0, 1)}
                     </span>
                     <span className="text-sm text-gray-500 font-medium">%</span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">
-                    ค่าความเพี้ยนแรงดัน L1
-                  </p>
+                  <p className="text-xs text-gray-400 mt-1">ค่าความเพี้ยนแรงดัน L1</p>
                 </div>
               </div>
               <THDChart data={ingestData} filter={timeFilter} />
@@ -1190,8 +1038,6 @@ export default function BuildingOverviewPage() {
     </div>
   );
 }
-
-
 
 //ประมาณการค่าไฟวันนี้ ฿2,255.25 บาท (517.5 kWh) แผนถูมิแท่ง
 // "use client";

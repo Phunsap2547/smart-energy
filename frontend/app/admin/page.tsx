@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, FormEvent } from "react";
-import { Building } from "@/types/building";
+//import { Building } from "@/types/building";
 import AdminTopbar from "@/components/admin/AdminTopbar";
 import AdminMap from "@/components/admin/AdminMap";
 import BuildingDrawer from "@/components/admin/BuildingDrawer";

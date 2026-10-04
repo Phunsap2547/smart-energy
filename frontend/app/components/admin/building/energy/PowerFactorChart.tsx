@@ -355,8 +355,6 @@ import { getTimeRangeIso, processEnergyReadings } from '@/lib/energyUtils';
 import {
   AreaChart,
   Area,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -443,19 +441,31 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
                   });
 
                   const maxRead = data && data.length > 0 ? data[0] : null;
+                  const val = maxRead ? Number(maxRead.power_factor) || null : null;
+
                   return {
                     time: dayLabel,
                     fullTime: fullDateLabel,
-                    power_factor: maxRead ? Number(maxRead.power_factor) || 0 : 0,
+                    power_factor: val && val > 0 ? val : null,
                   };
                 })
             );
           }
 
           const results = await Promise.all(dayPromises);
-          setChartData(results);
 
-          const validItems = results.filter((item) => item.power_factor > 0);
+          // กรองเอาเฉพาะวันที่มีข้อมูลจริง (PF > 0) เพื่อไม่ให้กราฟดิ่งลง 0 หรือมีพื้นที่ว่างฝั่งซ้าย
+          const validResults = results.filter(
+            (item) => item.power_factor !== null && item.power_factor > 0
+          );
+          const finalData = validResults.length > 0 ? validResults : results;
+
+          setChartData(finalData);
+
+          const validItems = finalData.filter(
+            (item) => item.power_factor !== null && item.power_factor > 0
+          );
+
           if (validItems.length > 0) {
             const highestPf = Math.max(...validItems.map((item) => item.power_factor));
             const totalPf = validItems.reduce((sum, item) => sum + item.power_factor, 0);
@@ -484,7 +494,9 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
             const processed = processEnergyReadings(data as EnergyIngest[], 'day');
             setChartData(processed);
 
-            const validItems = processed.filter((item) => item.power_factor > 0);
+            const validItems = processed.filter(
+              (item) => item.power_factor !== null && item.power_factor > 0
+            );
             if (validItems.length > 0) {
               const highestPf = Math.max(...validItems.map((item) => item.power_factor));
               const totalPf = validItems.reduce((sum, item) => sum + item.power_factor, 0);
@@ -514,7 +526,7 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
     return <div className="h-72 flex items-center justify-center text-slate-400">กำลังโหลดข้อมูล...</div>;
   }
 
-  const hasData = chartData.some((item) => item.power_factor > 0);
+  const hasData = chartData.some((item) => item.power_factor !== null && item.power_factor > 0);
   const isPenaltyRisk = avgPf < 0.85 && avgPf > 0;
 
   return (
@@ -552,73 +564,53 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
       ) : (
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            {isMultiDay ? (
-              // โหมดหลายวัน (7d / 30d): ใช้ LineChart แบบมีจุด Marker
-              <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="time" tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
-                <YAxis domain={[0, 1]} tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-slate-900 text-white text-xs p-2.5 rounded-lg shadow-lg border border-slate-700">
-                          <p className="font-medium text-slate-300 mb-1">{data.fullTime}</p>
-                          <p className="text-blue-400 font-bold">PF สูงสุด: {data.power_factor}</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="power_factor"
-                  name="PF System"
-                  stroke="#2563eb"
-                  strokeWidth={2}
-                  dot={{ r: 4, fill: '#2563eb' }}
-                />
-              </LineChart>
-            ) : (
-              // โหมดรายวัน (day): ใช้ AreaChart สไตล์กึ่งโปร่งแสง ปิดจุดวงกลมหนาแน่น ทำให้เส้นกราฟเรียบเนียน สะอาดตา
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorPf" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="time" tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
-                <YAxis domain={[0, 1]} tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-slate-900 text-white text-xs p-2.5 rounded-lg shadow-lg border border-slate-700">
-                          <p className="font-medium text-slate-300 mb-1">{data.fullTime}</p>
-                          <p className="text-blue-400 font-bold">PF รวม: {data.power_factor}</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="power_factor"
-                  stroke="#2563eb"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorPf)"
-                  dot={false}
-                  activeDot={{ r: 5, fill: '#2563eb' }}
-                />
-              </AreaChart>
-            )}
+            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: isMultiDay ? 25 : 0 }}>
+              <defs>
+                <linearGradient id="colorPf" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#2563eb" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#2563eb" stopOpacity={0.0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              
+              {/* ปรับแต่งแกน X ให้เอียง -45 องศาแบบเดียวกับ Peak Demand */}
+              <XAxis
+                dataKey="time"
+                interval={isMultiDay ? 0 : 'preserveStartEnd'}
+                angle={isMultiDay ? -45 : 0}
+                textAnchor={isMultiDay ? 'end' : 'middle'}
+                height={isMultiDay ? 45 : 30}
+                tick={{ fontSize: 9, fill: '#64748b' }}
+                stroke="#cbd5e1"
+              />
+              <YAxis domain={[0, 1]} tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-slate-900 text-white text-xs p-2.5 rounded-lg shadow-lg border border-slate-700">
+                        <p className="font-medium text-slate-300 mb-1">{data.fullTime}</p>
+                        <p className="text-blue-400 font-bold">
+                          {isMultiDay ? 'PF สูงสุด: ' : 'PF รวม: '}
+                          {data.power_factor !== null ? data.power_factor : 'ไม่มีข้อมูล'}
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="power_factor"
+                stroke="#2563eb"
+                strokeWidth={2}
+                fillOpacity={1}
+                fill="url(#colorPf)"
+                connectNulls={true}
+              />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       )}

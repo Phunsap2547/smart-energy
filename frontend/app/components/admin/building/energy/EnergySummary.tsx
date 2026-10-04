@@ -239,3 +239,4 @@ export default function EnergySummary({ data, timeRange = 'day', loading }: Ener
     </div>
   );
 }
+

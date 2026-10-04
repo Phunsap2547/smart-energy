@@ -328,6 +328,7 @@
 //   );
 // }
 
+//PeakDemandChart.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -337,8 +338,6 @@ import { getTimeRangeIso, processEnergyReadings } from '@/lib/energyUtils';
 import {
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -372,7 +371,6 @@ export const PeakDemandChart: React.FC<PeakDemandChartProps> = ({
       try {
         setLoading(true);
 
-        // 1. ดึง device_id ทั้งหมดของอาคารนี้
         const { data: devices, error: deviceError } = await supabase
           .from('devices')
           .select('id')
@@ -389,7 +387,6 @@ export const PeakDemandChart: React.FC<PeakDemandChartProps> = ({
         }
 
         if (isMultiDay) {
-          // โหมด 7 วัน หรือ 30 วัน: ดึงค่า Peak สูงสุดของแต่ละวัน
           const daysCount = timeRange === '30d' ? 30 : 7;
           const baseDate = selectedDate ? new Date(selectedDate) : new Date();
 
@@ -398,11 +395,8 @@ export const PeakDemandChart: React.FC<PeakDemandChartProps> = ({
             const d = new Date(baseDate);
             d.setDate(d.getDate() - i);
 
-            const startOfDay = new Date(d);
-            startOfDay.setHours(0, 0, 0, 0);
-
-            const endOfDay = new Date(d);
-            endOfDay.setHours(23, 59, 59, 999);
+            const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+            const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
 
             dayPromises.push(
               supabase
@@ -425,22 +419,31 @@ export const PeakDemandChart: React.FC<PeakDemandChartProps> = ({
                   });
 
                   const maxRead = data && data.length > 0 ? data[0] : null;
+                  const val = maxRead ? Number(maxRead.power_kw) || null : null;
+
                   return {
                     time: dayLabel,
                     fullTime: fullDateLabel,
-                    power_kw: maxRead ? Number(maxRead.power_kw) || 0 : 0,
+                    power_kw: val && val > 0 ? val : null,
                   };
                 })
             );
           }
 
           const results = await Promise.all(dayPromises);
-          setChartData(results);
+
+          // กรองเอาเฉพาะวันที่มีข้อมูลจริงเพื่อไม่ให้เกิดพื้นที่ว่างสีขาวฝั่งซ้าย
+          const validResults = results.filter(
+            (item) => item.power_kw !== null && item.power_kw > 0
+          );
+          const finalData = validResults.length > 0 ? validResults : results;
+
+          setChartData(finalData);
 
           let maxKw = 0;
           let maxTime = '-';
-          results.forEach((item) => {
-            if (item.power_kw > maxKw) {
+          finalData.forEach((item) => {
+            if (item.power_kw && item.power_kw > maxKw) {
               maxKw = item.power_kw;
               maxTime = item.fullTime;
             }
@@ -449,7 +452,6 @@ export const PeakDemandChart: React.FC<PeakDemandChartProps> = ({
           setPeakKw(Number(maxKw.toFixed(2)));
           setPeakTime(maxTime);
         } else {
-          // โหมด 1 วัน: ดึงข้อมูลแบบ Intraday ตลอดช่วงเวลาของวันนั้น
           const { startIso, endIso } = getTimeRangeIso('day', selectedDate);
 
           const { data, error } = await supabase
@@ -498,7 +500,7 @@ export const PeakDemandChart: React.FC<PeakDemandChartProps> = ({
     return <div className="h-72 flex items-center justify-center text-slate-400">กำลังโหลดข้อมูล...</div>;
   }
 
-  const hasData = chartData.some((item) => item.power_kw > 0);
+  const hasData = chartData.some((item) => item.power_kw !== null && item.power_kw > 0);
 
   return (
     <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
@@ -527,66 +529,53 @@ export const PeakDemandChart: React.FC<PeakDemandChartProps> = ({
       ) : (
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            {isMultiDay ? (
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="time" tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
-                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-slate-900 text-white text-xs p-2.5 rounded-lg shadow-lg border border-slate-700">
-                          <p className="font-medium text-slate-300 mb-1">{data.fullTime}</p>
-                          <p className="text-amber-400 font-bold">
-                            Peak สูงสุด: {data.power_kw?.toLocaleString()} kW
-                          </p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Bar dataKey="power_kw" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={28} />
-              </BarChart>
-            ) : (
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorKw" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="time" tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
-                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-slate-900 text-white text-xs p-2.5 rounded-lg shadow-lg border border-slate-700">
-                          <p className="font-medium text-slate-300 mb-1">{data.fullTime}</p>
-                          <p className="text-amber-400 font-bold">
-                            กำลังไฟฟ้า: {data.power_kw?.toLocaleString()} kW
-                          </p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="power_kw"
-                  stroke="#f59e0b"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorKw)"
-                />
-              </AreaChart>
-            )}
+            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: isMultiDay ? 25 : 0 }}>
+              <defs>
+                <linearGradient id="colorKw" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              
+              {/* ปรับแต่งแกน X ให้เอียง 45 องศาเฉพาะตอนแสดงหลายวัน เพื่อป้องกันข้อความซ้อนกัน */}
+              <XAxis
+                dataKey="time"
+                interval={isMultiDay ? 0 : 'preserveStartEnd'}
+                angle={isMultiDay ? -45 : 0}
+                textAnchor={isMultiDay ? 'end' : 'middle'}
+                height={isMultiDay ? 45 : 30}
+                tick={{ fontSize: 9, fill: '#64748b' }}
+                stroke="#cbd5e1"
+              />
+              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-slate-900 text-white text-xs p-2.5 rounded-lg shadow-lg border border-slate-700">
+                        <p className="font-medium text-slate-300 mb-1">{data.fullTime}</p>
+                        <p className="text-amber-400 font-bold">
+                          {isMultiDay ? 'Peak สูงสุด: ' : 'กำลังไฟฟ้า: '}
+                          {data.power_kw !== null ? `${data.power_kw?.toLocaleString()} kW` : 'ไม่มีข้อมูล'}
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="power_kw"
+                stroke="#f59e0b"
+                strokeWidth={2}
+                fillOpacity={1}
+                fill="url(#colorKw)"
+                connectNulls={true}
+              />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       )}

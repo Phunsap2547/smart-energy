@@ -760,7 +760,7 @@ import { Zap, Activity, Gauge, Radio, TrendingUp } from 'lucide-react';
 import OverviewCard from '@/components/admin/building/overview/OverviewCard';
 import ActiveEnergyChart from '@/components/admin/building/overview/ActiveEnergyChart';
 import PhaseTable from '@/components/admin/building/overview/PhaseTable';
-import THDChart from '@/components/admin/building/overview/THDChart';
+import CurrentChart from '@/components/admin/building/overview/THDChart';
 
 import BuildingSidebar from '@/components/admin/building/shared/BuildingSidebar';
 import RealtimeClock from '@/components/admin/building/shared/RealtimeClock';
@@ -923,16 +923,14 @@ export default function BuildingOverviewPage() {
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-bold text-gray-900">ภาพรวมระบบ</h1>
                 <span
-                  className={`text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 ${
-                    isOffline
+                  className={`text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 ${isOffline
                       ? 'bg-red-100 text-red-700 animate-pulse'
                       : 'bg-emerald-100 text-emerald-700'
-                  }`}
+                    }`}
                 >
                   <span
-                    className={`w-2 h-2 rounded-full ${
-                      isOffline ? 'bg-red-500' : 'bg-emerald-500'
-                    }`}
+                    className={`w-2 h-2 rounded-full ${isOffline ? 'bg-red-500' : 'bg-emerald-500'
+                      }`}
                   />
                   {isOffline ? 'Offline' : 'Realtime Online'}
                 </span>
@@ -941,6 +939,7 @@ export default function BuildingOverviewPage() {
             </div>
             <RealtimeClock />
           </div>
+
 
           {/* ⚡ Banners การแจ้งเตือนไฟดับ / ค่าไฟฟ้าผิดปกติ */}
           <StatusAlertBanners status={status} />
@@ -1020,17 +1019,17 @@ export default function BuildingOverviewPage() {
             <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm space-y-4">
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="text-sm font-medium text-gray-500">THD voltage (L1)</p>
+                  <p className="text-sm font-medium text-gray-500">System Current</p>
                   <div className="flex items-baseline gap-1 mt-1">
                     <span className="text-2xl font-bold text-gray-900">
-                      {formatNumber(displayLatest?.thd_voltage_l1_pct ?? 0, 1)}
+                      {formatNumber(displayLatest?.current_system ?? 0, 2)}
                     </span>
-                    <span className="text-sm text-gray-500 font-medium">%</span>
+                    <span className="text-sm text-gray-500 font-medium">A</span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">ค่าความเพี้ยนแรงดัน L1</p>
+                  <p className="text-xs text-gray-400 mt-1">กระแสรวมของระบบ</p>
                 </div>
               </div>
-              <THDChart data={ingestData} filter={timeFilter} />
+              <CurrentChart data={ingestData} filter={timeFilter} />
             </div>
           </div>
         </div>

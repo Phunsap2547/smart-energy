@@ -33,7 +33,7 @@ sb = create_client(
 
 
 BUILDING_RANK = {"warning": 1, "high": 2, "critical": 3}
-BUILDING_STATUS = {0: "normal", 1: "warning", 2: "warning", 3: "critical"}
+BUILDING_STATUS = {0: "normal", 1: "warning",  2: "critical"}
 ACTIVE_STATUSES = ["open", "investigating"]  # ยังไม่ปิดเรื่อง -> ไม่สร้างซ้ำ
 
 

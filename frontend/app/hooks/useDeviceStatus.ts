@@ -21,7 +21,8 @@ export function useDeviceStatus(latestData: EnergyIngest | null) {
     const pf = isOffline ? 0 : (latestData?.power_factor ?? 0);
     const freq = isOffline ? 0 : (latestData?.frequency_hz ?? 0);
 
-    const isVoltageAnomaly = !isOffline && (voltage < 380 || voltage > 440);
+    // const isVoltageAnomaly = !isOffline && (voltage < 380 || voltage > 440);
+    const isVoltageAnomaly = !isOffline && (voltage < 220 || voltage > 240);
     const isCurrentAnomaly = !isOffline && current >= 100;
     const isPfAnomaly = !isOffline && pf < 0.8;
     const isFreqAnomaly = !isOffline && (freq < 49 || freq > 51);

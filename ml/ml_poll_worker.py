@@ -13,6 +13,9 @@ import logging
 import os
 import time
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from supabase import create_client
 
 from ml_worker import Reading, predict  # ใช้ตรรกะทำนายชุดเดียวกับ API
@@ -22,8 +25,8 @@ log = logging.getLogger("ml_poll")
 
 POLL_SEC = float(os.getenv("POLL_SEC", "5"))
 COLS = (
-    "device_id,reading_time,voltage_a,voltage_b,voltage_c,"
-    "current_a,current_b,current_c,pf_a,pf_b,pf_c"
+    "device_id,reading_time,voltage_a,voltage_b,voltage_c,voltage_system,"
+    "current_a,current_b,current_c,current_system,pf_a,pf_b,pf_c,power_factor"
 )
 
 sb = create_client(

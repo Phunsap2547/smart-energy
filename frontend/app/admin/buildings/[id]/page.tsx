@@ -952,7 +952,7 @@ export default function BuildingOverviewPage() {
               unit="V"
               subtitle="แรงดันระบบ"
               statusLabel={isOffline ? 'Offline' : isVoltageAnomaly ? 'ผิดปกติ' : 'ปกติ'}
-              statusRange="ช่วงปกติ 380 - 440 V"
+              statusRange="ช่วงปกติ 220 - 240 V"
               isError={isOffline || isVoltageAnomaly}
               borderColor={isOffline ? '#ef4444' : '#3b82f6'}
               icon={<Zap size={20} className={isOffline || isVoltageAnomaly ? 'text-red-600' : 'text-emerald-600'} />}

@@ -68,7 +68,7 @@ export default function StatusAlertBanners({ status }: StatusAlertBannersProps) 
             <span className="font-medium text-sm">
               พบค่าความผิดปกติในระบบไฟฟ้า —{' '}
               {isPfAnomaly && `Power factor รวมต่ำ (${formatNumber(pf, 2)}) `}
-              {isVoltageAnomaly && `แรงดันไม่อยู่ในช่วง 380-440V (${formatNumber(voltage, 1)}V) `}
+              {isVoltageAnomaly && `แรงดันไม่อยู่ในช่วง 220-240V (${formatNumber(voltage, 1)}V) `}
               {isCurrentAnomaly && `กระแสเกินเกณฑ์ (${formatNumber(current, 1)}A) `}
               {isFreqAnomaly && `ความถี่ไม่อยู่ในช่วง 49-51Hz (${formatNumber(freq, 1)}Hz) `}
               — ควรตรวจสอบโหลด

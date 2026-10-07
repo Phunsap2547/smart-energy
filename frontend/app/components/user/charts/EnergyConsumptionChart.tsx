@@ -336,6 +336,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { Zap } from "lucide-react";
 
 interface Props {
   // today = null หมายถึงช่วงเวลาที่ยังมาไม่ถึง
@@ -344,9 +345,14 @@ interface Props {
   darkMode?: boolean;
 }
 
+// ความสูงขั้นต่ำของพื้นที่กราฟ (ถ้าการ์ดถูกยืดให้สูงกว่านี้ กราฟจะขยายตามเอง)
+const MIN_CHART_HEIGHT = 280;
+const ACCENT = "#f59e0b";
+
 export default function EnergyConsumptionChart({ data, rangeLabel, darkMode = false }: Props) {
-  const gridColor = darkMode ? "#2a2d36" : "#f1f5f9";
+  const gridColor = darkMode ? "#2a2d36" : "#eef0f3";
   const textColor = darkMode ? "#9ca3af" : "#94a3b8";
+  const titleColor = darkMode ? "#f3f4f6" : "#1f2937";
   const tooltipBg = darkMode ? "#1f2937" : "#ffffff";
   const tooltipBorder = darkMode ? "#374151" : "#e2e8f0";
 
@@ -355,10 +361,8 @@ export default function EnergyConsumptionChart({ data, rangeLabel, darkMode = fa
   const maxTodayValue = validTodayValues.length > 0 ? Math.max(...validTodayValues) : null;
   const peakDataPoint = data?.find((d) => d.today === maxTodayValue);
 
-  const DAY_TICKS = [
-    "00:00", "02:00", "04:00", "06:00", "08:00", "10:00",
-    "12:00", "14:00", "16:00", "18:00", "20:00", "22:00", "23:00",
-  ];
+  // Ticks แกน X: ใช้ชุดเดียวกับกราฟแท่ง (ทุก 3 ชม.) และไม่มี 22:00 ชนกับ 23:59 แล้ว
+  const DAY_TICKS = ["00:00", "03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00", "23:00"];
   const formatDayTick = (v: string) => (v === "23:00" ? "23:59" : v);
   const isDayMode = data?.length === 24 && (data[0] as any)?.label === "00:00";
 
@@ -366,31 +370,47 @@ export default function EnergyConsumptionChart({ data, rangeLabel, darkMode = fa
     <div
       style={{
         background: darkMode ? "#111827" : "#fff",
-        border: `1px solid ${darkMode ? "#1f2937" : "#e5e7eb"}`,
+        border: `1px solid ${darkMode ? "#1f2937" : "#eceff3"}`,
         borderRadius: 16,
         padding: "20px 24px 16px",
-        boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
+        display: "flex",
+        flexDirection: "column",
+        height: "100%", // ยืดเต็มกล่องที่ครอบอยู่
+        width: "100%",
       }}
     >
-      {/* Header สไตล์คลีนตามตัวอย่าง */}
+      {/* Header */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
-          marginBottom: 16,
+          gap: 12,
+          marginBottom: 8,
         }}
       >
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 18, fontWeight: 700, color: darkMode ? "#f3f4f6" : "#1f2937" }}>
-            <span style={{ color: "#f59e0b" }}>⚡</span> Energy Consumption (kWh)
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              fontSize: 18,
+              fontWeight: 700,
+              color: titleColor,
+            }}
+          >
+            <span style={{ display: "inline-flex", color: ACCENT }}>
+              <Zap size={20} />
+            </span>
+            Energy Consumption (kWh)
           </div>
-          <div style={{ fontSize: 12, color: textColor, marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: textColor, marginTop: 4 }}>
             เปรียบเทียบการใช้งานพลังงานไฟฟ้าวันนี้กับเมื่อวาน
           </div>
         </div>
 
-        {/* Badge แสดง Peak สูงสุด เหมือนในตัวอย่าง */}
+        {/* Badge แสดง Peak สูงสุด */}
         {maxTodayValue !== null && (
           <div
             style={{
@@ -401,6 +421,7 @@ export default function EnergyConsumptionChart({ data, rangeLabel, darkMode = fa
               fontSize: 12,
               color: "#d97706",
               fontWeight: 500,
+              whiteSpace: "nowrap",
             }}
           >
             Peak สูงสุด: <strong style={{ fontSize: 13 }}>{maxTodayValue.toLocaleString()} kWh</strong>{" "}
@@ -409,85 +430,96 @@ export default function EnergyConsumptionChart({ data, rangeLabel, darkMode = fa
         )}
       </div>
 
-      {/* Area Chart */}
-      <div style={{ width: "100%", height: 260 }}>
-        {data && data.length > 0 ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <defs>
-                {/* Gradient แรเงาสีส้มใต้อนาคตกราฟของ "วันนี้" */}
-                <linearGradient id="todayGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
-                </linearGradient>
-              </defs>
+      {/* Area Chart: flex-1 กินพื้นที่ที่เหลือทั้งหมด */}
+      <div style={{ flex: 1, minHeight: MIN_CHART_HEIGHT, position: "relative" }}>
+        <div style={{ position: "absolute", inset: 0 }}>
+          {data && data.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data} margin={{ top: 10, right: 8, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="todayGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={ACCENT} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={ACCENT} stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
 
-              <CartesianGrid strokeDasharray="2 2" stroke={gridColor} vertical={false} />
+                <CartesianGrid strokeDasharray="2 4" stroke={gridColor} vertical={false} />
 
-              <XAxis
-                dataKey="label"
-                tick={{ fontSize: 11, fill: textColor }}
-                axisLine={{ stroke: gridColor }}
-                tickLine={false}
-                ticks={isDayMode ? DAY_TICKS : undefined}
-                tickFormatter={isDayMode ? formatDayTick : undefined}
-                interval={isDayMode ? 0 : "preserveStartEnd"}
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: textColor }}
-                axisLine={false}
-                tickLine={false}
-              />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 12, fill: textColor }}
+                  axisLine={false}
+                  tickLine={false}
+                  ticks={isDayMode ? DAY_TICKS : undefined}
+                  tickFormatter={isDayMode ? formatDayTick : undefined}
+                  interval={isDayMode ? 0 : "preserveStartEnd"}
+                  dy={8}
+                />
+                <YAxis
+                  tick={{ fontSize: 12, fill: textColor }}
+                  axisLine={false}
+                  tickLine={false}
+                />
 
-              <Tooltip
-                formatter={(value: any) => [`${Number(value).toLocaleString()} kWh`]}
-                contentStyle={{
-                  backgroundColor: tooltipBg,
-                  borderColor: tooltipBorder,
-                  borderRadius: 8,
-                  fontSize: 12,
-                  color: textColor,
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                }}
-              />
+                <Tooltip
+                  formatter={(value: any) => [`${Number(value).toLocaleString()} kWh`]}
+                  contentStyle={{
+                    backgroundColor: tooltipBg,
+                    borderColor: tooltipBorder,
+                    borderRadius: 10,
+                    fontSize: 12,
+                    color: textColor,
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                  }}
+                />
 
-              <Legend
-                wrapperStyle={{ fontSize: 12, color: textColor, paddingTop: "12px" }}
-                iconType="circle"
-              />
+                <Legend
+                  wrapperStyle={{ fontSize: 12, color: textColor, paddingTop: "8px" }}
+                  iconType="circle"
+                />
 
-              {/* 1. เส้นเมื่อวาน (อยู่ด้านหลัง - เส้นประสีเทา/ฟ้า คลีนๆ) */}
-              <Area
-                type="monotone"
-                dataKey="yesterday"
-                name="ก่อนหน้า"
-                stroke="#94a3b8"
-                strokeWidth={1.5}
-                strokeDasharray="4 4"
-                fill="none"
-                dot={false}
-                activeDot={{ r: 4 }}
-              />
+                {/* เส้นเมื่อวาน (เส้นประสีเทา) */}
+                <Area
+                  type="monotone"
+                  dataKey="yesterday"
+                  name="ก่อนหน้า"
+                  stroke="#94a3b8"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                  fill="none"
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                />
 
-              {/* 2. เส้นวันนี้ (อยู่ด้านหน้า - Area Gradient สีส้ม) */}
-              <Area
-                type="monotone"
-                dataKey="today"
-                name={rangeLabel}
-                stroke="#f59e0b"
-                strokeWidth={2}
-                fill="url(#todayGradient)"
-                dot={false}
-                activeDot={{ r: 5, fill: "#f59e0b", stroke: "#fff", strokeWidth: 2 }}
-                connectNulls={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        ) : (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: textColor, fontSize: 13 }}>
-            ไม่มีข้อมูลสำหรับแสดงผล
-          </div>
-        )}
+                {/* เส้นวันนี้ (Area Gradient สีส้ม) */}
+                <Area
+                  type="monotone"
+                  dataKey="today"
+                  name={rangeLabel}
+                  stroke={ACCENT}
+                  strokeWidth={2}
+                  fill="url(#todayGradient)"
+                  dot={false}
+                  activeDot={{ r: 5, fill: ACCENT, stroke: "#fff", strokeWidth: 2 }}
+                  connectNulls={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+                color: textColor,
+                fontSize: 13,
+              }}
+            >
+              ไม่มีข้อมูลสำหรับแสดงผล
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

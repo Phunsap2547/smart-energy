@@ -676,9 +676,9 @@ export default function PhasePage({ params }: { params: Promise<{ id: string }> 
           </div>
         </div>
 
-        {chartData.length > 0 && (
+        {/* {chartData.length > 0 && (
           <UnbalanceAlert unbalanceValue={currentUnbalance} buildingId={buildingId} />
-        )}
+        )} */}
       </main>
 
       {/* 🟢 Popup Modal ขนาดใหญ่ -> ส่ง `chartData` (ครบทั้ง 24 ชั่วโมง) + แถบ Brush ลากเลื่อนดูย้อนหลังได้ */}

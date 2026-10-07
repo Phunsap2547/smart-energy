@@ -674,6 +674,124 @@
 // }
 
 
+// // components/admin/building/phase/PhaseLineChart.tsx
+// "use client";
+
+// import React from "react";
+// import { EnergyIngest } from "@/types/energy";
+// import { formatNumber } from "@/lib/formatter";
+// import Link from "next/link";
+// import { useParams } from "next/navigation";
+
+// interface PhaseTableProps {
+//   latestData: EnergyIngest | null;
+//   isOffline?: boolean; // ✅ เพิ่ม Prop รับสถานะ Offline
+// }
+
+// export default function PhaseTable({ latestData, isOffline = false }: PhaseTableProps) {
+//   const params = useParams();
+//   const buildingId = params?.id;
+
+//   // ⚡ ถ้า Offline ให้บังคับทุกค่าเป็น 0 ทั้งหมด
+//   const phases = [
+//     {
+//       phase: "L1",
+//       voltage: isOffline ? 0 : (latestData?.voltage_a ?? latestData?? 0),
+//       current: isOffline ? 0 : (latestData?.current_a ?? latestData ?? 0),
+//       pf: isOffline ? 0 : (latestData?.pf_a ?? latestData ?? 0),
+//       thdV: isOffline ? 0 : (latestData?.thd_voltage_l1_pct ?? 0),
+//       thdI: isOffline ? 0 : (latestData?.thd_current_l1_pct ?? 0),
+//       isError: false,
+//     },
+//     {
+//       phase: "L2",
+//       voltage: isOffline ? 0 : (latestData?.voltage_b ?? latestData ?? 0),
+//       current: isOffline ? 0 : (latestData?.current_b ?? latestData?? 0),
+//       pf: isOffline ? 0 : (latestData?.pf_b ?? latestData ?? 0),
+//       thdV: isOffline ? 0 : (latestData?.thd_voltage_l2_pct ?? 0),
+//       thdI: isOffline ? 0 : (latestData?.thd_current_l2_pct ?? 0),
+//       isError: false,
+//     },
+//     {
+//       phase: "L3",
+//       voltage: isOffline ? 0 : (latestData?.voltage_c ?? latestData ?? 0),
+//       current: isOffline ? 0 : (latestData?.current_c ?? latestData ?? 0),
+//       pf: isOffline ? 0 : (latestData?.pf_c ?? latestData ?? 0),
+//       thdV: isOffline ? 0 : (latestData?.thd_voltage_l3_pct ?? 0),
+//       thdI: isOffline ? 0 : (latestData?.thd_current_l3_pct ?? 0),
+//       isError: false,
+//     },
+//   ];
+
+//   return (
+//     <div className="space-y-3">
+//       <div className="flex justify-between items-center">
+//         <h2 className="text-base font-semibold text-gray-800">
+//           รายเฟส — เปรียบเทียบความสมดุลของโหลด
+//         </h2>
+//         <Link
+//           href={`/admin/buildings/${buildingId}/phase`}
+//           className="text-xs bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg border border-emerald-200 flex items-center gap-1 hover:bg-emerald-100 transition"
+//         >
+//           📊 ดูรายเฟสแบบกราฟ
+//         </Link>
+//       </div>
+
+//       <div className="overflow-x-auto">
+//         <table className="w-full text-sm text-left border-collapse">
+//           <thead>
+//             <tr className="border-b border-gray-100 text-gray-500 font-medium text-xs">
+//               <th className="py-2.5 px-3">เฟส</th>
+//               <th className="py-2.5 px-3">แรงดัน (V)</th>
+//               <th className="py-2.5 px-3">กระแส (A)</th>
+//               <th className="py-2.5 px-3">PF</th>
+//               <th className="py-2.5 px-3">THD-V (%)</th>
+//               <th className="py-2.5 px-3">THD-I (%)</th>
+//               <th className="py-2.5 px-3 text-center">สถานะ</th>
+//             </tr>
+//           </thead>
+//           <tbody className="divide-y divide-gray-50 font-medium">
+//             {phases.map((p) => {
+//               const statusText = isOffline ? "Offline" : p.isError ? "ผิดปกติ" : "ปกติ";
+//               const isBadgeRed = isOffline || p.isError;
+
+//               return (
+//                 <tr
+//                   key={p.phase}
+//                   className={isBadgeRed ? "bg-red-50/30 text-red-600" : "text-gray-700"}
+//                 >
+//                   <td className="py-3 px-3 font-semibold">{p.phase}</td>
+//                   <td className="py-3 px-3">{formatNumber(p.voltage, 0)} V</td>
+//                   <td className="py-3 px-3">{formatNumber(p.current, 1)} A</td>
+//                   <td className="py-3 px-3">{formatNumber(p.pf, 2)}</td>
+//                   <td className="py-3 px-3">{formatNumber(p.thdV, 1)} %</td>
+//                   <td className="py-3 px-3">{formatNumber(p.thdI, 1)} %</td>
+//                   <td className="py-3 px-3 text-center">
+//                     <span
+//                       className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+//                         isBadgeRed
+//                           ? "bg-red-100 text-red-700"
+//                           : "bg-emerald-100 text-emerald-700"
+//                       }`}
+//                     >
+//                       <span
+//                         className={`w-1.5 h-1.5 rounded-full ${
+//                           isBadgeRed ? "bg-red-500" : "bg-emerald-500"
+//                         }`}
+//                       />
+//                       {statusText}
+//                     </span>
+//                   </td>
+//                 </tr>
+//               );
+//             })}
+//           </tbody>
+//         </table>
+//       </div>
+//     </div>
+//   );
+// }
+
 // components/admin/building/phase/PhaseLineChart.tsx
 "use client";
 
@@ -685,43 +803,97 @@ import { useParams } from "next/navigation";
 
 interface PhaseTableProps {
   latestData: EnergyIngest | null;
-  isOffline?: boolean; // ✅ เพิ่ม Prop รับสถานะ Offline
+  isOffline?: boolean;
+}
+
+// เกณฑ์ตรวจ (ปรับได้) — แรงดันใช้ช่วงเดียวกับแบนเนอร์ 220-240V
+const V_MIN = 220;
+const V_MAX = 240;
+const V_NO_SIGNAL = 22;   // ต่ำกว่านี้ถือว่าไม่มีแรงดัน/ไม่ได้ต่อเฟส
+const PF_MIN = 0.85;
+const CURRENT_MIN_FOR_PF = 0.1; // กระแสต่ำกว่านี้ PF ไม่มีความหมาย ไม่ตรวจ
+const THD_V_MAX = 8;      // %
+const THD_I_MAX = 20;     // %
+
+type Raw = {
+  phase: string;
+  voltage: number | null | undefined;
+  current: number | null | undefined;
+  pf: number | null | undefined;
+  thdV: number | null | undefined;
+  thdI: number | null | undefined;
+};
+
+function analyze(p: Raw) {
+  const v = p.voltage ?? null;
+  const i = p.current ?? null;
+  const pf = p.pf ?? null;
+  const thdV = p.thdV ?? null;
+  const thdI = p.thdI ?? null;
+
+  // เฟสที่ไม่มีข้อมูล / ไม่ได้ต่อ
+  if (v === null || v < V_NO_SIGNAL) {
+    return {
+      state: "nodata" as const,
+      reasons: [v === null ? "ไม่มีข้อมูลเฟสนี้" : `แรงดัน ${formatNumber(v, 0)} V (อาจไม่ได้ต่อเฟสนี้)`],
+      bad: { v: false, i: false, pf: false, thdV: false, thdI: false },
+      v: v ?? 0, i: i ?? 0, pf: pf ?? 0, thdV: thdV ?? 0, thdI: thdI ?? 0,
+    };
+  }
+
+  const bad = {
+    v: v > V_MAX || v < V_MIN,
+    i: false,
+    pf: pf !== null && (i ?? 0) >= CURRENT_MIN_FOR_PF && pf < PF_MIN,
+    thdV: thdV !== null && thdV > THD_V_MAX,
+    thdI: thdI !== null && thdI > THD_I_MAX,
+  };
+
+  const reasons: string[] = [];
+  if (v > V_MAX) reasons.push(`แรงดันสูง ${formatNumber(v, 1)} V (เกิน ${V_MAX})`);
+  else if (v < V_MIN) reasons.push(`แรงดันต่ำ ${formatNumber(v, 1)} V (ต่ำกว่า ${V_MIN})`);
+  if (bad.pf) reasons.push(`PF ต่ำ ${formatNumber(pf as number, 2)} (ต่ำกว่า ${PF_MIN})`);
+  if (bad.thdV) reasons.push(`THD-V สูง ${formatNumber(thdV as number, 1)}%`);
+  if (bad.thdI) reasons.push(`THD-I สูง ${formatNumber(thdI as number, 1)}%`);
+
+  return {
+    state: reasons.length > 0 ? ("error" as const) : ("ok" as const),
+    reasons,
+    bad,
+    v, i: i ?? 0, pf: pf ?? 0, thdV: thdV ?? 0, thdI: thdI ?? 0,
+  };
 }
 
 export default function PhaseTable({ latestData, isOffline = false }: PhaseTableProps) {
   const params = useParams();
   const buildingId = params?.id;
 
-  // ⚡ ถ้า Offline ให้บังคับทุกค่าเป็น 0 ทั้งหมด
-  const phases = [
-    {
-      phase: "L1",
-      voltage: isOffline ? 0 : (latestData?.voltage_a ?? latestData?.voltage_l1 ?? 0),
-      current: isOffline ? 0 : (latestData?.current_a ?? latestData?.current_l1 ?? 0),
-      pf: isOffline ? 0 : (latestData?.pf_a ?? latestData?.pf_l1 ?? 0),
-      thdV: isOffline ? 0 : (latestData?.thd_voltage_l1_pct ?? 0),
-      thdI: isOffline ? 0 : (latestData?.thd_current_l1_pct ?? 0),
-      isError: false,
-    },
-    {
-      phase: "L2",
-      voltage: isOffline ? 0 : (latestData?.voltage_b ?? latestData?.voltage_l2 ?? 0),
-      current: isOffline ? 0 : (latestData?.current_b ?? latestData?.current_l2 ?? 0),
-      pf: isOffline ? 0 : (latestData?.pf_b ?? latestData?.pf_l2 ?? 0),
-      thdV: isOffline ? 0 : (latestData?.thd_voltage_l2_pct ?? 0),
-      thdI: isOffline ? 0 : (latestData?.thd_current_l2_pct ?? 0),
-      isError: false,
-    },
-    {
-      phase: "L3",
-      voltage: isOffline ? 0 : (latestData?.voltage_c ?? latestData?.voltage_l3 ?? 0),
-      current: isOffline ? 0 : (latestData?.current_c ?? latestData?.current_l3 ?? 0),
-      pf: isOffline ? 0 : (latestData?.pf_c ?? latestData?.pf_l3 ?? 0),
-      thdV: isOffline ? 0 : (latestData?.thd_voltage_l3_pct ?? 0),
-      thdI: isOffline ? 0 : (latestData?.thd_current_l3_pct ?? 0),
-      isError: false,
-    },
+  const raws: Raw[] = [
+    { phase: "L1", voltage: latestData?.voltage_a, current: latestData?.current_a, pf: latestData?.pf_a, thdV: latestData?.thd_voltage_l1_pct, thdI: latestData?.thd_current_l1_pct },
+    { phase: "L2", voltage: latestData?.voltage_b, current: latestData?.current_b, pf: latestData?.pf_b, thdV: latestData?.thd_voltage_l2_pct, thdI: latestData?.thd_current_l2_pct },
+    { phase: "L3", voltage: latestData?.voltage_c, current: latestData?.current_c, pf: latestData?.pf_c, thdV: latestData?.thd_voltage_l3_pct, thdI: latestData?.thd_current_l3_pct },
   ];
+
+  const phases = raws.map((r) => {
+    if (isOffline) {
+      return {
+        phase: r.phase, state: "offline" as const,
+        reasons: ["ไม่ได้รับข้อมูล (Offline)"],
+        bad: { v: false, i: false, pf: false, thdV: false, thdI: false },
+        v: 0, i: 0, pf: 0, thdV: 0, thdI: 0,
+      };
+    }
+    return { phase: r.phase, ...analyze(r) };
+  });
+
+  const badge = {
+    ok: { text: "ปกติ", cls: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500" },
+    error: { text: "ผิดปกติ", cls: "bg-red-100 text-red-700", dot: "bg-red-500" },
+    offline: { text: "Offline", cls: "bg-red-100 text-red-700", dot: "bg-red-500" },
+    nodata: { text: "ไม่มีข้อมูล", cls: "bg-gray-100 text-gray-500", dot: "bg-gray-400" },
+  } as const;
+
+  const cell = (isBad: boolean) => (isBad ? "text-red-600 font-bold" : "");
 
   return (
     <div className="space-y-3">
@@ -752,35 +924,31 @@ export default function PhaseTable({ latestData, isOffline = false }: PhaseTable
           </thead>
           <tbody className="divide-y divide-gray-50 font-medium">
             {phases.map((p) => {
-              const statusText = isOffline ? "Offline" : p.isError ? "ผิดปกติ" : "ปกติ";
-              const isBadgeRed = isOffline || p.isError;
-
+              const b = badge[p.state];
+              const rowCls =
+                p.state === "error" || p.state === "offline"
+                  ? "bg-red-50/30"
+                  : p.state === "nodata"
+                  ? "text-gray-400"
+                  : "text-gray-700";
               return (
-                <tr
-                  key={p.phase}
-                  className={isBadgeRed ? "bg-red-50/30 text-red-600" : "text-gray-700"}
-                >
+                <tr key={p.phase} className={rowCls}>
                   <td className="py-3 px-3 font-semibold">{p.phase}</td>
-                  <td className="py-3 px-3">{formatNumber(p.voltage, 0)} V</td>
-                  <td className="py-3 px-3">{formatNumber(p.current, 1)} A</td>
-                  <td className="py-3 px-3">{formatNumber(p.pf, 2)}</td>
-                  <td className="py-3 px-3">{formatNumber(p.thdV, 1)} %</td>
-                  <td className="py-3 px-3">{formatNumber(p.thdI, 1)} %</td>
+                  <td className={`py-3 px-3 ${cell(p.bad.v)}`}>{formatNumber(p.v, 1)} V</td>
+                  <td className={`py-3 px-3 ${cell(p.bad.i)}`}>{formatNumber(p.i, 1)} A</td>
+                  <td className={`py-3 px-3 ${cell(p.bad.pf)}`}>{formatNumber(p.pf, 2)}</td>
+                  <td className={`py-3 px-3 ${cell(p.bad.thdV)}`}>{formatNumber(p.thdV, 1)} %</td>
+                  <td className={`py-3 px-3 ${cell(p.bad.thdI)}`}>{formatNumber(p.thdI, 1)} %</td>
                   <td className="py-3 px-3 text-center">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                        isBadgeRed
-                          ? "bg-red-100 text-red-700"
-                          : "bg-emerald-100 text-emerald-700"
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          isBadgeRed ? "bg-red-500" : "bg-emerald-500"
-                        }`}
-                      />
-                      {statusText}
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${b.cls}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`} />
+                      {b.text}
                     </span>
+                    {p.state !== "ok" && (
+                      <div className="mt-1 text-[11px] font-normal text-gray-500 leading-tight">
+                        {p.reasons.join(" · ")}
+                      </div>
+                    )}
                   </td>
                 </tr>
               );

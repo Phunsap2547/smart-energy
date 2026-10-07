@@ -18,6 +18,8 @@
 //   );
 // }
 
+
+//alerts
 'use client';
 
 import { use, useEffect, useState, useCallback } from 'react';
@@ -81,7 +83,7 @@ export default function AlertsPage({ params }: { params: Promise<{ id: string }>
           <div>
             <h1 className="text-2xl font-bold text-slate-800">ประวัติการแจ้งเตือน</h1>
             <p className="text-sm text-slate-500 mt-1">
-              ติดตามเหตุการณ์ความผิดปกติ และการตรวจจับไฟดับ / สัญญาณขาดหาย (0 - 15 นาที)
+              ติดตามเหตุการณ์ความผิดปกติ และการตรวจจับไฟดับ / สัญญาณขาดหาย
             </p>
           </div>
         </div>

@@ -1,3 +1,5 @@
+//types/energy.ts
+
 export interface EnergyIngest {
   id: number;
   building_id: number;
@@ -42,7 +44,7 @@ export interface EnergyIngest {
   thd_current_l2_pct?: number;
   thd_current_l3_pct?: number;
 
-  daily_energy_kwh?: number | null;
+  //daily_energy_kwh?: number | null;
 }
 
 // export interface EnergyIngest {

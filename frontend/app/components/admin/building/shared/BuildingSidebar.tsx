@@ -86,7 +86,7 @@ export default function BuildingSidebar({ buildingId }: BuildingSidebarProps) {
     // { id: 'quality', label: 'คุณภาพไฟฟ้า', icon: Activity, href: `/admin/buildings/${buildingId}/quality` },
     { id: 'reports', label: 'พลังงาน / รายงาน', icon: BarChart3, href: `/admin/buildings/${buildingId}/energy` },
     { id: 'alerts', label: 'แจ้งเตือน', icon: Bell, href: `/admin/buildings/${buildingId}/alerts` },
-    //{ id: 'thresholds', label: 'ตั้งค่า threshold', icon: SlidersHorizontal, href: `/admin/buildings/${buildingId}/threshold` },
+    //{ id: ' ', label: 'ตั้งค่า threshold', icon: SlidersHorizontal, href: `/admin/buildings/${buildingId}/threshold` },
   ];
 
   return (

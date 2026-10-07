@@ -346,9 +346,11 @@
 //   );
 // }
 
+//PowerFactorChart.tsx
+//PowerFactorChart.tsx
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { EnergyIngest } from '@/types/energy';
 import { getTimeRangeIso, processEnergyReadings } from '@/lib/energyUtils';
@@ -363,25 +365,83 @@ import {
 } from 'recharts';
 import { Activity, AlertTriangle } from 'lucide-react';
 
+// ดึง energy_readings ครบทั้งช่วงเวลา โดยวนดึงทีละ 1000 แถว (Supabase จำกัด 1000 แถวต่อครั้ง)
+async function fetchAllReadings(
+  deviceIds: (string | number)[],
+  startIso: string,
+  endIso: string
+) {
+  const PAGE_SIZE = 1000;
+  let page = 0;
+  const all: any[] = [];
+
+  while (true) {
+    const from = page * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    const { data, error } = await supabase
+      .from('energy_readings')
+      .select('*')
+      .in('device_id', deviceIds)
+      .gte('reading_time', startIso)
+      .lte('reading_time', endIso)
+      .order('reading_time', { ascending: true })
+      .order('id', { ascending: true }) // ถ้าตารางไม่มีคอลัมน์ id ให้ลบบรรทัดนี้
+      .range(from, to);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+
+    all.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    page++;
+  }
+
+  return all;
+}
+
 interface PowerFactorChartProps {
   buildingId: string | number;
   timeRange?: 'day' | '7d' | '30d' | string;
   selectedDate?: string;
+  /**
+   * ส่งค่า PF ที่ badge ของกราฟแสดง กลับไปให้หน้าหลัก
+   * kind = 'avg' (โหมดรายวัน: ค่าเฉลี่ย) หรือ 'max' (โหมด 7/30 วัน: ค่าสูงสุดรายวัน)
+   */
+  onPfChange?: (pf: number, kind: 'avg' | 'max') => void;
 }
 
 export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
   buildingId,
   timeRange = 'day',
   selectedDate,
+  onPfChange,
 }) => {
   const [chartData, setChartData] = useState<any[]>([]);
   const [avgPf, setAvgPf] = useState<number>(0);
   const [maxPf, setMaxPf] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
 
+  // เก็บ callback ไว้ใน ref เพื่อไม่ให้การเปลี่ยน callback ทำให้ดึงข้อมูลใหม่
+  const onPfChangeRef = useRef(onPfChange);
+  useEffect(() => {
+    onPfChangeRef.current = onPfChange;
+  }, [onPfChange]);
+
   const isMultiDay = timeRange === '7d' || timeRange === '30d';
 
   useEffect(() => {
+    let isSubscribed = true;
+
+    // อัปเดต state ภายใน + แจ้งหน้าหลักในที่เดียว
+    const applyPf = (avg: number, max: number) => {
+      if (!isSubscribed) return;
+      setAvgPf(avg);
+      setMaxPf(max);
+      if (isMultiDay) onPfChangeRef.current?.(max, 'max');
+      else onPfChangeRef.current?.(avg, 'avg');
+    };
+
     async function fetchPfData() {
       if (!buildingId) return;
 
@@ -398,9 +458,9 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
 
         const deviceIds = devices?.map((d) => d.id) || [];
         if (deviceIds.length === 0) {
+          if (!isSubscribed) return;
           setChartData([]);
-          setAvgPf(0);
-          setMaxPf(0);
+          applyPf(0, 0);
           return;
         }
 
@@ -427,7 +487,9 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
                 .in('device_id', deviceIds)
                 .gte('reading_time', startOfDay.toISOString())
                 .lte('reading_time', endOfDay.toISOString())
-                .order('power_factor', { ascending: false })
+                // .gt ตัดแถว NULL ออก (Postgres เรียง NULL ขึ้นก่อนเมื่อ desc ทำให้ limit(1) ได้แถวว่าง)
+                .gt('power_factor', 0)
+                .order('power_factor', { ascending: false, nullsFirst: false })
                 .limit(1)
                 .then(({ data }) => {
                   const dayLabel = d.toLocaleDateString('th-TH', {
@@ -453,6 +515,7 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
           }
 
           const results = await Promise.all(dayPromises);
+          if (!isSubscribed) return;
 
           // กรองเอาเฉพาะวันที่มีข้อมูลจริง (PF > 0) เพื่อไม่ให้กราฟดิ่งลง 0 หรือมีพื้นที่ว่างฝั่งซ้าย
           const validResults = results.filter(
@@ -467,30 +530,22 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
           );
 
           if (validItems.length > 0) {
-            const highestPf = Math.max(...validItems.map((item) => item.power_factor));
-            const totalPf = validItems.reduce((sum, item) => sum + item.power_factor, 0);
-            setMaxPf(Number(highestPf.toFixed(2)));
-            setAvgPf(Number((totalPf / validItems.length).toFixed(2)));
+            const highestPf = Math.max(...validItems.map((item) => item.power_factor as number));
+            const totalPf = validItems.reduce((sum, item) => sum + (item.power_factor as number), 0);
+            applyPf(
+              Number((totalPf / validItems.length).toFixed(2)),
+              Number(highestPf.toFixed(2))
+            );
           } else {
-            setMaxPf(0);
-            setAvgPf(0);
+            applyPf(0, 0);
           }
         } else {
-          // โหมด 1 วัน (รายวัน): ดึงข้อมูล Intraday
+          // โหมด 1 วัน (รายวัน): ดึงข้อมูลครบทั้งวันแบบวนหน้า
           const { startIso, endIso } = getTimeRangeIso('day', selectedDate);
+          const data = await fetchAllReadings(deviceIds, startIso, endIso);
+          if (!isSubscribed) return;
 
-          const { data, error } = await supabase
-            .from('energy_readings')
-            .select('*')
-            .in('device_id', deviceIds)
-            .gte('reading_time', startIso)
-            .lte('reading_time', endIso)
-            .order('reading_time', { ascending: true })
-            .limit(3000);
-
-          if (error) throw error;
-
-          if (data && data.length > 0) {
+          if (data.length > 0) {
             const processed = processEnergyReadings(data as EnergyIngest[], 'day');
             setChartData(processed);
 
@@ -498,28 +553,32 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
               (item) => item.power_factor !== null && item.power_factor > 0
             );
             if (validItems.length > 0) {
-              const highestPf = Math.max(...validItems.map((item) => item.power_factor));
-              const totalPf = validItems.reduce((sum, item) => sum + item.power_factor, 0);
-              setMaxPf(Number(highestPf.toFixed(2)));
-              setAvgPf(Number((totalPf / validItems.length).toFixed(2)));
+              const highestPf = Math.max(...validItems.map((item) => item.power_factor as number));
+              const totalPf = validItems.reduce((sum, item) => sum + (item.power_factor as number), 0);
+              applyPf(
+                Number((totalPf / validItems.length).toFixed(2)),
+                Number(highestPf.toFixed(2))
+              );
             } else {
-              setMaxPf(0);
-              setAvgPf(0);
+              applyPf(0, 0);
             }
           } else {
             setChartData([]);
-            setAvgPf(0);
-            setMaxPf(0);
+            applyPf(0, 0);
           }
         }
       } catch (err) {
         console.error('Error loading Power Factor chart:', err);
       } finally {
-        setLoading(false);
+        if (isSubscribed) setLoading(false);
       }
     }
 
     fetchPfData();
+
+    return () => {
+      isSubscribed = false;
+    };
   }, [buildingId, timeRange, selectedDate, isMultiDay]);
 
   if (loading) {
@@ -533,10 +592,10 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
     <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
         <div>
-          <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-            <Activity className="w-5 h-5 text-blue-500" /> Power Factor (PF)
+          <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+            <Activity className="w-6 h-6 text-blue-500" /> Power Factor (PF)
           </h3>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm text-slate-500">
             {isMultiDay
               ? 'ค่าตัวประกอบกำลังไฟฟ้าสูงสุดประจำวัน (เป้าหมาย ≥ 0.85)'
               : 'ค่าตัวประกอบกำลังไฟฟ้า (เป้าหมาย ≥ 0.85)'}
@@ -550,9 +609,9 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
               : 'bg-emerald-50 border-emerald-200 text-emerald-700'
           }`}
         >
-          <span className="text-xs font-medium">{isMultiDay ? 'PF สูงสุด:' : 'PF เฉลี่ย:'}</span>
-          <span className="text-sm font-bold">{isMultiDay ? maxPf : avgPf}</span>
-          {isPenaltyRisk && <span className="text-[10px] font-semibold text-rose-600">(เสี่ยงค่าปรับ)</span>}
+          <span className="text-sm font-medium">{isMultiDay ? 'PF สูงสุด:' : 'PF เฉลี่ย:'}</span>
+          <span className="text-base font-bold">{isMultiDay ? maxPf : avgPf}</span>
+          {isPenaltyRisk && <span className="text-xs font-semibold text-rose-600">(เสี่ยงค่าปรับ)</span>}
         </div>
       </div>
 
@@ -564,7 +623,7 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
       ) : (
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: isMultiDay ? 25 : 0 }}>
+            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: isMultiDay ? 25 : 0 }}>
               <defs>
                 <linearGradient id="colorPf" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#2563eb" stopOpacity={0.4} />
@@ -572,7 +631,7 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              
+
               {/* ปรับแต่งแกน X ให้เอียง -45 องศาแบบเดียวกับ Peak Demand */}
               <XAxis
                 dataKey="time"
@@ -580,16 +639,16 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
                 angle={isMultiDay ? -45 : 0}
                 textAnchor={isMultiDay ? 'end' : 'middle'}
                 height={isMultiDay ? 45 : 30}
-                tick={{ fontSize: 9, fill: '#64748b' }}
+                tick={{ fontSize: 11, fill: '#64748b' }}
                 stroke="#cbd5e1"
               />
-              <YAxis domain={[0, 1]} tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
+              <YAxis domain={[0, 1]} tick={{ fontSize: 13, fill: '#64748b' }} stroke="#cbd5e1" />
               <Tooltip
                 content={({ active, payload }) => {
                   if (active && payload && payload.length) {
                     const data = payload[0].payload;
                     return (
-                      <div className="bg-slate-900 text-white text-xs p-2.5 rounded-lg shadow-lg border border-slate-700">
+                      <div className="bg-slate-900 text-white text-sm p-2.5 rounded-lg shadow-lg border border-slate-700">
                         <p className="font-medium text-slate-300 mb-1">{data.fullTime}</p>
                         <p className="text-blue-400 font-bold">
                           {isMultiDay ? 'PF สูงสุด: ' : 'PF รวม: '}

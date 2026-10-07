@@ -1,3 +1,4 @@
+//DailyEnergyChart.tsx
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -9,6 +10,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Cell,
 } from 'recharts';
 import { supabase } from '@/lib/supabase';
 
@@ -20,7 +22,7 @@ interface DailyEnergyChartProps {
 
 interface ChartDataItem {
   label: string;
-  fullDateText: string; 
+  fullDateText: string;
   energy: number;
 }
 
@@ -59,7 +61,7 @@ const formatDateStr = (d: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-// แปลง Date Object เป็นข้อความวันที่เต็มภาษาไทย (เช่น วันจันทร์ที่ 29 กันยายน 2569)
+// แปลง Date Object เป็นข้อความวันที่เต็มภาษาไทย
 const formatFullThaiDate = (d: Date, isHourView: boolean = false, hourStr: string = ''): string => {
   const dayName = DAYS_TH_FULL[d.getDay()];
   const dateNum = d.getDate();
@@ -164,21 +166,21 @@ export default function DailyEnergyChart({
       }
 
       // 3. สร้าง Skeleton มารอไว้ก่อน
-      const groupedMap: { 
-        [key: string]: { 
-          min: number | null; 
-          max: number | null; 
+      const groupedMap: {
+        [key: string]: {
+          min: number | null;
+          max: number | null;
           label: string;
           fullDateText: string;
-        } 
+        }
       } = {};
 
       if (timeRange === 'day') {
         for (let h = 0; h < 24; h++) {
           const hourStr = `${String(h).padStart(2, '0')}:00`;
-          groupedMap[hourStr] = { 
-            min: null, 
-            max: null, 
+          groupedMap[hourStr] = {
+            min: null,
+            max: null,
             label: hourStr,
             fullDateText: formatFullThaiDate(targetDateObj, true, hourStr),
           };
@@ -190,10 +192,10 @@ export default function DailyEnergyChart({
           d.setDate(d.getDate() - i);
           const dateKey = formatDateStr(d);
           const label = timeRange === '7d' ? DAYS_TH_SHORT[d.getDay()] : `${d.getDate()}/${d.getMonth() + 1}`;
-          
-          groupedMap[dateKey] = { 
-            min: null, 
-            max: null, 
+
+          groupedMap[dateKey] = {
+            min: null,
+            max: null,
             label,
             fullDateText: formatFullThaiDate(d),
           };
@@ -254,23 +256,24 @@ export default function DailyEnergyChart({
     fetchEnergyChartData();
   }, [fetchEnergyChartData]);
 
-  const chartTitle = timeRange === 'day' 
-    ? 'การใช้พลังงานรายชั่วโมง (kWh)' 
-    : timeRange === '7d' 
-    ? 'การใช้พลังงานรายวัน (7 วันล่าสุด)' 
-    : 'การใช้พลังงานรายวัน (30 วันล่าสุด)';
+  const chartTitle = timeRange === 'day'
+    ? 'การใช้พลังงานรายชั่วโมง (kWh)'
+    : timeRange === '7d'
+      ? 'การใช้พลังงานรายวัน (7 วันล่าสุด)'
+      : 'การใช้พลังงานรายวัน (30 วันล่าสุด)';
 
   const avgLabel = timeRange === 'day' ? 'kWh/ชั่วโมง' : 'kWh/วัน';
 
   return (
-    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+    /* 💡 ใส่ col-span-1 lg:col-span-2 ตรงนี้เพื่อให้ขยายเต็ม 2 คอลัมน์บนจอใหญ่ */
+    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm col-span-1 lg:col-span-2">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-bold text-slate-800 text-sm">{chartTitle}</h3>
           <p className="text-xs text-slate-400 mt-0.5">ปริมาณการใช้ไฟแยกตามช่วงเวลา</p>
         </div>
         <div className="text-right">
-          <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
+          <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
             {loading ? 'กำลังคำนวณ...' : `เฉลี่ย ${avgEnergy} ${avgLabel}`}
           </span>
         </div>
@@ -283,18 +286,21 @@ export default function DailyEnergyChart({
           <div className="text-xs text-slate-400">ไม่มีข้อมูลการใช้พลังงานในช่วงเวลานี้</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <BarChart
+              data={data}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+              barCategoryGap={timeRange === '7d' ? '30%' : '10%'} // 💡 เพิ่มระยะห่างช่องไฟระหว่างแท่งเมื่อเป็น 7 วัน
+            >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis 
-                dataKey="label" 
-                tickLine={false} 
-                axisLine={false} 
-                tick={{ fontSize: 10, fill: '#64748b' }} 
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                tick={{ fontSize: 11, fill: '#64748b' }}
                 interval={0}
               />
               <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#64748b' }} />
-              
-              {/* 💡 แสดงข้อมูลวันที่เต็ม พ.ศ. เมื่อนำเมาส์ไปชี้แท่งกราฟ */}
+
               <Tooltip
                 labelFormatter={(_, payload) => {
                   if (payload && payload.length > 0) {
@@ -303,14 +309,27 @@ export default function DailyEnergyChart({
                   return '';
                 }}
                 formatter={(value: number) => [`${value} kWh`, 'ปริมาณการใช้ไฟ']}
-                contentStyle={{ 
-                  borderRadius: '12px', 
-                  border: 'none', 
+                contentStyle={{
+                  borderRadius: '12px',
+                  border: 'none',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
                   fontSize: '12px',
                 }}
               />
-              <Bar dataKey="energy" fill="#10b981" radius={[6, 6, 0, 0]} barSize={18} />
+
+              {/* 💡 กำหนด maxBarSize เพื่อไม่ให้แท่งกราฟขยายกว้างเกินไปเมื่อข้อมูลมีน้อย */}
+              <Bar
+                dataKey="energy"
+                radius={[6, 6, 0, 0]}
+                maxBarSize={36}
+              >
+                {data.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={entry.energy > avgEnergy * 1.3 ? '#059669' : '#10b981'}
+                  />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         )}

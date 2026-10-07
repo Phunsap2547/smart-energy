@@ -1,3 +1,4 @@
+//EnergySummary.tsx
 'use client';
 
 import React from 'react';
@@ -35,8 +36,18 @@ export interface EnergyTelemetryData {
   thd_current_l1_pct: number | null;
 }
 
+// ค่าที่ได้จากกราฟ Peak Demand และ Power Factor (ช่วงเวลาเดียวกับกราฟ)
+export interface EnergyPeakData {
+  peakKw: number | null;
+  peakKwTime: string | null;
+  peakPf: number | null;
+  /** 'avg' = PF เฉลี่ย (โหมดรายวัน), 'max' = PF สูงสุดรายวัน (โหมด 7/30 วัน) */
+  pfKind: 'avg' | 'max';
+}
+
 interface EnergySummaryProps {
   data?: EnergyTelemetryData | null;
+  peak?: EnergyPeakData | null;
   timeRange?: 'day' | '7d' | '30d' | string;
   loading?: boolean;
 }
@@ -94,10 +105,16 @@ function SummaryCard({ title, value, unit, subtitle, change, isPositive, icon: I
   );
 }
 
-export default function EnergySummary({ data, timeRange = 'day', loading }: EnergySummaryProps) {
+export default function EnergySummary({ data, peak, timeRange = 'day', loading }: EnergySummaryProps) {
   const cumulativeEnergy = data?.energy_kwh ?? 0;
-  const powerKw = data?.power_kw ?? 0;
-  const pf = data?.power_factor ?? 0;
+
+  // Peak kW และ PF มาจากกราฟ (ช่วงเวลาและวิธีคำนวณเดียวกัน)
+  const powerKw = peak?.peakKw ?? 0;
+  const pf = peak?.peakPf ?? 0;
+  const pfKind = peak?.pfKind ?? 'avg';
+
+  // ยังไม่ได้รับค่าจากกราฟ ให้แสดงสถานะกำลังโหลด
+  const peakLoading = loading || peak == null;
 
   // ใช้ค่าหน่วยไฟฟ้าของช่วงเวลานั้นๆ ที่ส่งมาจาก page.tsx
   const periodEnergyKwh = data?.daily_energy_kwh ?? 0;
@@ -112,86 +129,29 @@ export default function EnergySummary({ data, timeRange = 'day', loading }: Ener
     });
   };
 
-  // 1. กำหนดชื่อและคำอธิบาย: พลังงานไฟฟ้า (kWh)
-  const getEnergyTitle = () => {
-    switch (timeRange) {
-      case '7d':
-        return 'พลังงานไฟฟ้า (7 วันล่าสุด)';
-      case '30d':
-        return 'พลังงานไฟฟ้า (30 วันล่าสุด)';
-      default:
-        return 'พลังงานไฟฟ้าวันนี้';
-    }
-  };
+  const rangeLabel =
+    timeRange === '7d' ? '7 วันล่าสุด' : timeRange === '30d' ? '30 วันล่าสุด' : 'วันที่เลือก';
 
-  // 2. กำหนดชื่อและคำอธิบาย: กำลังไฟฟ้า (kW)
-  const getPowerTitle = () => {
-    switch (timeRange) {
-      case '7d':
-        return 'กำลังไฟฟ้าสูงสุด (Peak 7 วัน)';
-      case '30d':
-        return 'กำลังไฟฟ้าสูงสุด (Peak 30 วัน)';
-      default:
-        return 'กำลังไฟฟ้าปัจจุบัน (Real-time)';
-    }
-  };
+  // 1. พลังงานไฟฟ้า (kWh)
+  const getEnergyTitle = () => `พลังงานไฟฟ้า (${rangeLabel})`;
 
-  const getPowerSubtitle = () => {
-    switch (timeRange) {
-      case '7d':
-        return 'ค่ากำลังไฟฟ้าสูงสุดในช่วง 7 วันล่าสุด';
-      case '30d':
-        return 'ค่ากำลังไฟฟ้าสูงสุดในช่วง 30 วันล่าสุด';
-      default:
-        return 'ค่ากำลังไฟฟ้าขณะนี้';
-    }
-  };
+  // 2. กำลังไฟฟ้าสูงสุด (kW) ตรงกับกราฟ Peak Demand
+  const getPowerTitle = () => `กำลังไฟฟ้าสูงสุด (Peak ${rangeLabel})`;
+  const getPowerSubtitle = () =>
+    peak?.peakKwTime ? `เกิดขึ้นเมื่อ ${peak.peakKwTime}` : `ค่ากำลังไฟฟ้าสูงสุดใน${rangeLabel}`;
 
-  // 3. กำหนดชื่อและคำอธิบาย: Power Factor (PF)
-  const getPfTitle = () => {
-    switch (timeRange) {
-      case '7d':
-        return 'Power Factor (7 วันล่าสุด)';
-      case '30d':
-        return 'Power Factor (30 วันล่าสุด)';
-      default:
-        return 'Power Factor เฉลี่ยวันนี้';
-    }
-  };
+  // 3. Power Factor ตรงกับกราฟ PF (รายวัน = เฉลี่ย, หลายวัน = สูงสุดรายวัน)
+  const getPfTitle = () =>
+    pfKind === 'max' ? `Power Factor สูงสุด (${rangeLabel})` : `Power Factor เฉลี่ย (${rangeLabel})`;
+  const getPfSubtitle = () =>
+    pfKind === 'max' ? `ค่า PF สูงสุดใน${rangeLabel}` : `ค่า PF เฉลี่ยใน${rangeLabel}`;
 
-  const getPfSubtitle = () => {
-    switch (timeRange) {
-      case '7d':
-        return 'ค่า PF เฉลี่ยในช่วง 7 วันล่าสุด';
-      case '30d':
-        return 'ค่า PF เฉลี่ยในช่วง 30 วันล่าสุด';
-      default:
-        return 'ค่าตัวประกอบกำลังไฟฟ้าวันนี้';
-    }
-  };
+  // 4. ประมาณการค่าไฟฟ้า (บาท)
+  const getCostTitle = () => `ประมาณการค่าไฟฟ้า (${rangeLabel})`;
+  const getCostSubtitle = () => `คำนวณจากหน่วยไฟฟ้าใน${rangeLabel}`;
 
-  // 4. กำหนดชื่อและคำอธิบาย: ประมาณการค่าไฟ (บาท)
-  const getCostTitle = () => {
-    switch (timeRange) {
-      case '7d':
-        return 'ประมาณการค่าไฟฟ้า (7 วันล่าสุด)';
-      case '30d':
-        return 'ประมาณการค่าไฟฟ้า (30 วันล่าสุด)';
-      default:
-        return 'ประมาณการค่าไฟฟ้าวันนี้';
-    }
-  };
-
-  const getCostSubtitle = () => {
-    switch (timeRange) {
-      case '7d':
-        return 'คำนวณจากหน่วยไฟฟ้า 7 วันล่าสุด';
-      case '30d':
-        return 'คำนวณจากหน่วยไฟฟ้า 30 วันล่าสุด';
-      default:
-        return 'คำนวณจากหน่วยไฟฟ้าของวันนี้';
-    }
-  };
+  // แสดงสถานะ PF เฉพาะเมื่อเป็นค่าเฉลี่ย (ค่าสูงสุดจะดูดีกว่าความจริง)
+  const showPfStatus = pfKind === 'avg' && pf > 0;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -205,14 +165,14 @@ export default function EnergySummary({ data, timeRange = 'day', loading }: Ener
         loading={loading}
       />
 
-      {/* การ์ดที่ 2: กำลังไฟฟ้า (kW) */}
+      {/* การ์ดที่ 2: กำลังไฟฟ้าสูงสุด (kW) */}
       <SummaryCard
         title={getPowerTitle()}
         value={formatNum(powerKw, 2)}
         unit="kW"
         subtitle={getPowerSubtitle()}
         icon={TrendingUp}
-        loading={loading}
+        loading={peakLoading}
       />
 
       {/* การ์ดที่ 3: Power Factor (PF) */}
@@ -221,10 +181,10 @@ export default function EnergySummary({ data, timeRange = 'day', loading }: Ener
         value={formatNum(pf, 2)}
         unit="PF"
         subtitle={getPfSubtitle()}
-        change={pf >= 0.85 ? 'ปกติ' : 'ต่ำกว่าเกณฑ์'}
+        change={showPfStatus ? (pf >= 0.85 ? 'ปกติ' : 'ต่ำกว่าเกณฑ์') : undefined}
         isPositive={pf >= 0.85}
         icon={Activity}
-        loading={loading}
+        loading={peakLoading}
       />
 
       {/* การ์ดที่ 4: ประมาณการค่าไฟฟ้า */}
@@ -239,4 +199,3 @@ export default function EnergySummary({ data, timeRange = 'day', loading }: Ener
     </div>
   );
 }
-

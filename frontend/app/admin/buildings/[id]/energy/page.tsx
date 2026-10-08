@@ -261,13 +261,13 @@ export default function EnergyPage({ params }: { params: Promise<{ id: string }>
         </div>
         {/* Alert Widget */}
         <div className="grid grid-cols-1 gap-6">
-          <AlertWidget
+          {/* <AlertWidget
             buildingId={buildingId} // หรือ params.id ตามตัวแปรที่คุณใช้ใน page.tsx
             telemetry={telemetry}
             currentUnbalance={telemetry?.current_unbalance_pct}
             voltageUnbalance={telemetry?.voltage_unbalance_pct}
             thdCurrent={telemetry?.thd_current_l1_pct}
-          />
+          /> */}
         </div>
 
         {/* Modal พิมพ์รายงาน A4 */}

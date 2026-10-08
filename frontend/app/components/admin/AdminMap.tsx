@@ -11,16 +11,6 @@ import Link from 'next/link';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
-// กำหนด Custom Marker Icon เพื่อแก้ปัญหาหมุดแสดงผลไม่ถูกต้องใน Next.js
-const markerIcon = new L.Icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-});
-
 // หมุด "ร่าง" ใช้ตอนกำลังเพิ่ม/แก้ไขอาคาร เพื่อพรีวิวตำแหน่งก่อนบันทึกจริง
 const draftIcon = new L.Icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -32,10 +22,44 @@ const draftIcon = new L.Icon({
   className: "opacity-60 saturate-0",
 });
 
-const statusColorMap: Record<string, string> = {
-  Normal: theme.stats?.energyToday?.border || "#10b981",
-  Warning: theme.stats?.powerFactor?.border || "#f59e0b",
-  Critical: theme.stats?.status?.background || "#ef4444",
+// ✅ สีตามสถานะ (key เป็นตัวพิมพ์เล็กให้ตรงกับค่าใน buildings.status)
+// ปรับสีตรงนี้ที่เดียว มีผลทั้งหมุดและ badge
+const STATUS_COLOR: Record<string, string> = {
+  normal: "#16a34a",   // เขียว
+  warning: "#f59e0b",  // ส้ม/เหลือง
+  critical: "#dc2626", // แดง
+};
+const DEFAULT_COLOR = "#6b7280"; // เทา (สถานะที่ไม่รู้จัก)
+
+const STATUS_LABEL: Record<string, string> = {
+  normal: "Normal",
+  warning: "Warning",
+  critical: "Critical",
+};
+
+const normalizeStatus = (s?: string) => (s ?? "").trim().toLowerCase();
+
+const getStatusColor = (s?: string) =>
+  STATUS_COLOR[normalizeStatus(s)] ?? DEFAULT_COLOR;
+
+// ✅ หมุดแผนที่สีตามสถานะ (เก็บ cache ไม่สร้างใหม่ทุกครั้ง)
+const iconCache: Record<string, L.DivIcon> = {};
+const getPinIcon = (status?: string): L.DivIcon => {
+  const color = getStatusColor(status);
+  if (!iconCache[color]) {
+    iconCache[color] = L.divIcon({
+      className: "",
+      html: `<svg width="30" height="42" viewBox="0 0 30 42" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))">
+        <path d="M15 1C7.3 1 1 7.3 1 15c0 10.5 14 26 14 26s14-15.5 14-26C29 7.3 22.7 1 15 1z"
+              fill="${color}" stroke="#fff" stroke-width="2"/>
+        <circle cx="15" cy="15" r="5.5" fill="#fff"/>
+      </svg>`,
+      iconSize: [30, 42],
+      iconAnchor: [15, 42],
+      popupAnchor: [0, -38],
+    });
+  }
+  return iconCache[color];
 };
 
 interface Building {
@@ -75,7 +99,6 @@ function MapAutoFit({ buildings }: { buildings: Building[] }) {
   useEffect(() => {
     if (!buildings || buildings.length === 0 || hasFitted) return;
 
-    // ✅ กรองเฉพาะอาคารที่ไม่เป็น null/undefined และมีพิกัด lat, lng ที่ถูกต้อง
     const validBuildings = buildings.filter(
       (b) => b && b.lat != null && b.lng != null && !isNaN(Number(b.lat)) && !isNaN(Number(b.lng))
     );
@@ -99,10 +122,8 @@ function MapAutoFit({ buildings }: { buildings: Building[] }) {
 export default function AdminMapView() {
   const router = useRouter();
 
-  // ควบคุมการเปิด/ปิด Drawer จัดการอาคาร
   const [panelOpen, setPanelOpen] = useState(false);
 
-  // แหล่งข้อมูลเดียว ใช้ทั้งวาดหมุดบนแผนที่ และแสดง/แก้ไขในแผง
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -123,14 +144,17 @@ export default function AdminMapView() {
   };
 
   // ดึงข้อมูลอาคารจาก API เดียวกับที่ฟอร์มใช้บันทึก — ทำให้แผนที่กับแผงซิงค์กันเสมอ
-  const fetchBuildings = async () => {
+  // silent = true ใช้ตอนรีเฟรชเบื้องหลัง (ไม่โชว์ loading / error)
+  const fetchBuildings = async (silent = false) => {
     const token = getToken();
     if (!token) {
       router.push("/admin/login");
       return;
     }
-    setLoading(true);
-    setError(null);
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const res = await fetch(`${API_URL}/api/admin/buildings`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -145,28 +169,30 @@ export default function AdminMapView() {
       setBuildings(data || []);
     } catch (err) {
       console.error(err);
-      setError("เกิดข้อผิดพลาดในการโหลดข้อมูล");
+      if (!silent) setError("เกิดข้อผิดพลาดในการโหลดข้อมูล");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   // --- เพิ่มใน อัปรูป ---
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(
-    form.image_url || null // ถ้าเป็นโหมดแก้ไข ให้โชว์รูปเดิมก่อน
+    form.image_url || null
   );
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setImageFile(file);
-    setImagePreview(URL.createObjectURL(file)); // preview ทันทีแบบ local
+    setImagePreview(URL.createObjectURL(file));
   };
 
-  // โหลดทันทีตอนเข้าเพจ เพื่อให้หมุดบนแผนที่ขึ้นครบตั้งแต่แรก ไม่ต้องรอเปิดแผงก่อน
+  // โหลดทันทีตอนเข้าเพจ + ✅ รีเฟรชสถานะเบื้องหลังทุก 30 วินาที สีหมุดจะเปลี่ยนเองเมื่อสถานะอาคารเปลี่ยน
   useEffect(() => {
     fetchBuildings();
+    const timer = setInterval(() => fetchBuildings(true), 30000);
+    return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -191,16 +217,14 @@ export default function AdminMapView() {
     });
     setEditingId(b.id);
     setImageFile(null);
-    setImagePreview(b.image_url || null); // โชว์รูปเดิมตอนกดแก้ไข
+    setImagePreview(b.image_url || null);
     setError(null);
   };
 
-  // คลิกหมุด -> ไปหน้าแสดงข้อมูลอาคาร
   const handleMarkerClick = (b: Building) => {
     router.push(`/admin/buildings/${b.id}`);
   };
 
-  // คลิกบนแผนที่ตอนเปิดแผงจัดการ = เติม lat/lng ให้ฟอร์มอัตโนมัติ
   const handlePickLocation = (lat: number, lng: number) => {
     setForm((f) => ({ ...f, lat: String(lat), lng: String(lng) }));
   };
@@ -286,7 +310,6 @@ export default function AdminMapView() {
     }
   };
 
-  // ลบอาคาร
   const handleDelete = async (id: number) => {
     if (!confirm("ยืนยันการลบอาคารนี้?")) return;
 
@@ -333,7 +356,6 @@ export default function AdminMapView() {
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
-          {/* ปุ่มเปิด/ปิด แผงจัดการอาคาร */}
           <button
             onClick={() => {
               if (!panelOpen) resetForm();
@@ -376,27 +398,24 @@ export default function AdminMapView() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {/* คลิกบนแผนที่ตอนแผงจัดการเปิดอยู่ = เซ็ต lat/lng ให้ฟอร์มอัตโนมัติ */}
         <LocationPicker active={panelOpen} onPick={handlePickLocation} />
 
-        {/* ปรับตำแหน่งแผนที่อัตโนมัติ */}
         <MapAutoFit buildings={buildings} />
 
-        {/* ✅ วาด Marker เฉพาะอาคารที่มีข้อมูลครบสมบูรณ์เท่านั้น */}
         {buildings
           .filter((b) => b && b.lat != null && b.lng != null)
           .map((building) => (
             <Marker
               key={building.id}
               position={[Number(building.lat), Number(building.lng)]}
-              icon={markerIcon}
+              icon={getPinIcon(building.status)}
               eventHandlers={{
                 click: () => handleMarkerClick(building),
               }}
             >
               <Tooltip
                 direction="top"
-                offset={[0, -35]}
+                offset={[0, -40]}
                 opacity={1}
                 permanent
                 className="!bg-white !border-none !shadow-lg !rounded-lg"
@@ -406,12 +425,10 @@ export default function AdminMapView() {
                   {building.status && (
                     <span
                       className="inline-block text-[11px] font-bold px-2 py-0.5 rounded text-white mt-1"
-                      style={{
-                        backgroundColor:
-                          statusColorMap[building.status] || "#6b7280",
-                      }}
+                      style={{ backgroundColor: getStatusColor(building.status) }}
                     >
-                      {building.status}
+                      {STATUS_LABEL[normalizeStatus(building.status)] ??
+                        building.status}
                     </span>
                   )}
                 </div>
@@ -419,7 +436,6 @@ export default function AdminMapView() {
             </Marker>
           ))}
 
-        {/* หมุดร่าง — แสดงตำแหน่งที่กำลังจะบันทึก */}
         {hasDraftLocation && (
           <Marker
             position={[Number(form.lat), Number(form.lng)]}
@@ -446,7 +462,6 @@ export default function AdminMapView() {
           panelOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        {/* หัวแผง */}
         <div
           className="flex items-center justify-between px-5 py-4 shrink-0"
           style={{
@@ -466,7 +481,6 @@ export default function AdminMapView() {
           </button>
         </div>
 
-        {/* เนื้อหา scroll ได้ */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {error && (
             <div className="mb-4 p-3 rounded bg-red-100 text-red-700 text-sm">
@@ -474,7 +488,6 @@ export default function AdminMapView() {
             </div>
           )}
 
-          {/* ฟอร์มเพิ่ม/แก้ไข */}
           <form
             onSubmit={handleSubmit}
             className="flex flex-col gap-3 mb-6 p-4 border rounded-xl bg-gray-50"
@@ -584,7 +597,6 @@ export default function AdminMapView() {
             </button>
           </form>
 
-          {/* รายการอาคาร */}
           <h3 className="text-sm font-semibold text-gray-700 mb-2">
             รายการอาคารทั้งหมด ({buildings.length})
           </h3>

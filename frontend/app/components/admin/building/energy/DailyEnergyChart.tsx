@@ -266,7 +266,7 @@ export default function DailyEnergyChart({
 
   return (
     /* 💡 ใส่ col-span-1 lg:col-span-2 ตรงนี้เพื่อให้ขยายเต็ม 2 คอลัมน์บนจอใหญ่ */
-    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm col-span-1 lg:col-span-2">
+    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-bold text-slate-800 text-sm">{chartTitle}</h3>

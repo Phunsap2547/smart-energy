@@ -44,8 +44,8 @@ export default function BuildingDetailClient({ building, devices = [] }: Props) 
   const buildingName = building.name || building.building_name || "อาคารไม่ระบุชื่อ";
   const latitude = building.lat ?? 17.2882;
   const longitude = building.lng ?? 104.1132;
+  const imageUrl = building.image_url ?? null;
   const hasActiveAlert = alerts.some(isOpenAlert);
-
   return (
     <div className="min-h-screen w-full bg-[#f4f6f8] font-sans text-gray-900">
       {/* container: เต็มความกว้างจอ + gap สม่ำเสมอ */}
@@ -65,6 +65,7 @@ export default function BuildingDetailClient({ building, devices = [] }: Props) 
         {activeTab === "overview" ? (
           <OverviewTab
             buildingName={buildingName}
+            imageUrl={imageUrl}
             latitude={latitude}
             longitude={longitude}
             range={range}
@@ -77,6 +78,7 @@ export default function BuildingDetailClient({ building, devices = [] }: Props) 
           />
         ) : (
           <AlertsTab
+            buildingId={building.id} 
             buildingName={buildingName}
             locationName={building.locationName}
             latitude={latitude}

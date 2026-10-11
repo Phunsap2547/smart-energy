@@ -53,6 +53,8 @@
 //   });
 // });
 
+
+//adminUpload.js
 // module.exports = router;
 const express = require('express');
 const multer = require('multer');

@@ -174,8 +174,7 @@
 
 // module.exports = router;
 
-
-// alerts.js
+// routes/alerts.js
 const express = require('express');
 const supabase = require('../supabase');
 
@@ -186,7 +185,7 @@ const router = express.Router();
  * ดึงรายการ Alert/Anomaly สำหรับหน้า Public หรือ Dashboard ทั่วไป
  *
  * Query:
- *  - building_id : กรองเฉพาะอาคารนั้น (ใช้กับหน้ารายละเอียดอาคาร)  <-- ใหม่
+ *  - building_id : กรองเฉพาะอาคารนั้น (ใช้กับหน้ารายละเอียดอาคาร)
  *  - device_id   : device เดียว
  *  - device_ids  : หลาย device คั่นด้วย comma เช่น 1,2,3
  *  - type
@@ -204,15 +203,17 @@ router.get('/', async (req, res) => {
     let query = supabase
       .from('anomalies')
       .select(`
-        id,
-        device_id,
-        type,
-        severity,
-        description,
-        status,
-        created_at,
-        ${deviceRelation} ( id, name, building_id )
-      `)
+  id,
+  device_id,
+  type,
+  severity,
+  description,
+  status,
+  created_at,
+  resolved_at,
+  resolution_reason,
+  ${deviceRelation} ( id, name, building_id )
+`)
       .order('created_at', { ascending: false })
       .limit(safeLimit);
 

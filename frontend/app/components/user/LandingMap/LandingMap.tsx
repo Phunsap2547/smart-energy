@@ -118,6 +118,9 @@
 //     </div>
 //   );
 // }
+
+
+//LandingMap.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -127,7 +130,7 @@ import L from "leaflet";
 import { useRouter } from "next/navigation";
 import theme from "@/config/theme.js";
 import Link from "next/link";
-import { UserCircle2, Loader2 } from "lucide-react";
+import { UserCircle2, Loader2, Layers } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 interface Building {
@@ -139,10 +142,9 @@ interface Building {
 }
 
 // ✅ สีตามสถานะ (key เป็นตัวพิมพ์เล็กให้ตรงกับค่าใน buildings.status)
-// ปรับสีตรงนี้ที่เดียว มีผลทั้งหมุดและ badge
 const STATUS_COLOR: Record<string, string> = {
-  normal: "#16a34a",   // เขียว
-  warning: "#f59e0b",  // ส้ม/เหลือง
+  normal: "#16a34a", // เขียว
+  warning: "#f59e0b", // ส้ม/เหลือง
   critical: "#dc2626", // แดง
 };
 const DEFAULT_COLOR = "#6b7280"; // เทา (สถานะที่ไม่รู้จัก)
@@ -153,7 +155,6 @@ const STATUS_LABEL: Record<string, string> = {
   critical: "Critical",
 };
 
-// ทำให้ key เป็นตัวพิมพ์เล็กและตัดช่องว่าง กันค่าจาก DB ตัวพิมพ์ไม่ตรง
 const normalizeStatus = (s?: string) => (s ?? "").trim().toLowerCase();
 
 const getStatusColor = (s?: string) =>
@@ -179,10 +180,136 @@ const getPinIcon = (status?: string): L.DivIcon => {
   return iconCache[color];
 };
 
+// ---------------------------------------------------------------------------
+// ✅ ประเภทแผนที่ + ปุ่มสลับแบบกำหนดเอง
+// ---------------------------------------------------------------------------
+type MapType = "road" | "satellite" | "hybrid";
+
+const MAP_TYPES: { key: MapType; label: string }[] = [
+  { key: "road", label: "แผนที่" },
+  { key: "satellite", label: "ดาวเทียม" },
+  { key: "hybrid", label: "ดาวเทียม+ชื่อ" },
+];
+
+// 🌐 เปลี่ยนเป็น URL ของ Google Maps Tile Services
+const GOOGLE_ROADMAP = "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}";
+const GOOGLE_SATELLITE = "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}";
+const GOOGLE_HYBRID = "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}";
+
+// แปลงพิกัดเป็นเลขกระเบื้องแผนที่ (tile) เพื่อใช้เป็นภาพตัวอย่างบนปุ่ม
+function latLngToTile(lat: number, lng: number, z: number) {
+  const n = 2 ** z;
+  const x = Math.floor(((lng + 180) / 360) * n);
+  const latRad = (lat * Math.PI) / 180;
+  const y = Math.floor(
+    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n
+  );
+  return { x, y };
+}
+
+// ภาพตัวอย่างของแต่ละประเภท (ใช้กระเบื้อง Google Maps จริง)
+function Thumb({
+  type,
+  center,
+}: {
+  type: MapType;
+  center: [number, number];
+}) {
+  const z = 16;
+  const { x, y } = latLngToTile(center[0], center[1], z);
+  const road = `https://mt1.google.com/vt/lyrs=m&x=${x}&y=${y}&z=${z}`;
+  const sat = `https://mt1.google.com/vt/lyrs=s&x=${x}&y=${y}&z=${z}`;
+  const hybrid = `https://mt1.google.com/vt/lyrs=y&x=${x}&y=${y}&z=${z}`;
+  const cls = "absolute inset-0 w-full h-full object-cover";
+
+  return (
+    <div className="absolute inset-0 bg-gray-200">
+      {type === "road" && <img src={road} alt="" className={cls} />}
+      {type === "satellite" && <img src={sat} alt="" className={cls} />}
+      {type === "hybrid" && <img src={hybrid} alt="" className={cls} />}
+    </div>
+  );
+}
+
+function MapTypeSwitcher({
+  value,
+  onChange,
+  center,
+}: {
+  value: MapType;
+  onChange: (t: MapType) => void;
+  center: [number, number];
+}) {
+  const [open, setOpen] = useState(false);
+  const current = MAP_TYPES.find((m) => m.key === value)!;
+
+  return (
+    <div className="absolute left-4 bottom-8 z-[1000] flex items-end gap-3">
+      {/* ปุ่มใหญ่: แสดงประเภทที่เลือกอยู่ */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="เปลี่ยนประเภทแผนที่"
+        className="relative w-[88px] h-[88px] rounded-2xl overflow-hidden border-[3px] border-white shadow-xl transition-transform hover:scale-105 shrink-0"
+      >
+        <Thumb type={value} center={center} />
+        <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent pt-5 pb-1.5 text-white text-sm font-semibold text-center">
+          {current.label}
+        </span>
+      </button>
+
+      {/* แผงตัวเลือก: ขยายออกมาด้านขวาของปุ่ม */}
+      {open && (
+        <div className="flex items-start gap-3 bg-white rounded-2xl shadow-xl p-3">
+          {MAP_TYPES.map((m) => {
+            const active = m.key === value;
+            return (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => {
+                  onChange(m.key);
+                  setOpen(false);
+                }}
+                className="flex flex-col items-center gap-1.5 group"
+              >
+                <div
+                  className={`relative w-[72px] h-[72px] rounded-xl overflow-hidden border-[3px] transition ${
+                    active
+                      ? "border-blue-500"
+                      : "border-transparent group-hover:border-gray-300"
+                  }`}
+                >
+                  <Thumb type={m.key} center={center} />
+                </div>
+                <span
+                  className={`text-xs text-center leading-tight max-w-[76px] ${
+                    active ? "text-blue-600 font-semibold" : "text-gray-700"
+                  }`}
+                >
+                  {m.label}
+                </span>
+              </button>
+            );
+          })}
+
+          <div className="flex flex-col items-center gap-1.5 opacity-40 select-none">
+            <div className="w-[72px] h-[72px] rounded-xl bg-gray-100 flex items-center justify-center">
+              <Layers size={26} className="text-gray-700" />
+            </div>
+            <span className="text-xs text-gray-700">เพิ่มเติม</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LandingMap() {
   const router = useRouter();
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [mapType, setMapType] = useState<MapType>("road");
 
   useEffect(() => {
     async function fetchBuildings() {
@@ -204,7 +331,7 @@ export default function LandingMap() {
 
     fetchBuildings();
 
-    // ✅ รีเฟรชสถานะอาคารทุก 30 วินาที สีจะเปลี่ยนเองเมื่อสถานะเปลี่ยน
+    // ✅ รีเฟรชสถานะอาคารทุก 30 วินาที
     const timer = setInterval(async () => {
       const { data } = await supabase.from("buildings").select("*");
       if (data) setBuildings(data);
@@ -254,49 +381,88 @@ export default function LandingMap() {
           <span className="ml-2 text-gray-600">กำลังโหลดข้อมูลแผนที่...</span>
         </div>
       ) : (
-        <MapContainer
-          center={defaultCenter}
-          zoom={16}
-          scrollWheelZoom={true}
-          className="w-full h-full"
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+        <>
+          <MapContainer
+            center={defaultCenter}
+            zoom={16}
+            maxZoom={20}
+            scrollWheelZoom={true}
+            className="w-full h-full"
+          >
+            {/* 📍 แผนที่ถนน Google Maps */}
+            {mapType === "road" && (
+              <TileLayer
+                key="google-road"
+                attribution="&copy; Google Maps"
+                url={GOOGLE_ROADMAP}
+                maxZoom={20}
+              />
+            )}
 
-          {buildings.map((building) => (
-            <Marker
-              key={building.id}
-              position={[building.lat, building.lng]}
-              icon={getPinIcon(building.status)}
-              eventHandlers={{
-                click: () => router.push(`/building/${building.id}`),
-              }}
-            >
-              <Tooltip
-                direction="top"
-                offset={[0, -40]}
-                opacity={1}
-                permanent
-                className="!bg-white !border-none !shadow-lg !rounded-lg"
+            {/* 🛰️ ภาพดาวเทียม Google Maps */}
+            {mapType === "satellite" && (
+              <TileLayer
+                key="google-satellite"
+                attribution="&copy; Google Maps"
+                url={GOOGLE_SATELLITE}
+                maxZoom={20}
+              />
+            )}
+
+            {/* 🏷️ ภาพดาวเทียม + ป้ายชื่อสถานที่ Google Maps */}
+            {mapType === "hybrid" && (
+              <TileLayer
+                key="google-hybrid"
+                attribution="&copy; Google Maps"
+                url={GOOGLE_HYBRID}
+                maxZoom={20}
+              />
+            )}
+
+            {buildings.map((building) => (
+              <Marker
+                key={building.id}
+                position={[building.lat, building.lng]}
+                icon={getPinIcon(building.status)}
+                eventHandlers={{
+                  click: () => router.push(`/building/${building.id}`),
+                }}
               >
-                <div className="text-sm min-w-[140px] p-1">
-                  <p className="font-semibold text-gray-800">{building.name}</p>
-                  {building.status && (
-                    <span
-                      className="inline-block text-[11px] font-bold px-2 py-0.5 rounded text-white mt-1"
-                      style={{ backgroundColor: getStatusColor(building.status) }}
-                    >
-                      {STATUS_LABEL[normalizeStatus(building.status)] ??
-                        building.status}
-                    </span>
-                  )}
-                </div>
-              </Tooltip>
-            </Marker>
-          ))}
-        </MapContainer>
+                <Tooltip
+                  direction="top"
+                  offset={[0, -40]}
+                  opacity={1}
+                  permanent
+                  className="!bg-white !border-none !shadow-lg !rounded-lg"
+                >
+                  <div className="text-sm min-w-[140px] p-1">
+                    <p className="font-semibold text-gray-800">
+                      {building.name}
+                    </p>
+                    {building.status && (
+                      <span
+                        className="inline-block text-[11px] font-bold px-2 py-0.5 rounded text-white mt-1"
+                        style={{
+                          backgroundColor: getStatusColor(building.status),
+                        }}
+                      >
+                        {STATUS_LABEL[normalizeStatus(building.status)] ??
+                          building.status}
+                      </span>
+                    )}
+                  </div>
+                </Tooltip>
+              </Marker>
+            ))}
+          </MapContainer>
+
+          {/* ปุ่มสลับประเภทแผนที่ */}
+          <MapTypeSwitcher
+            value={mapType}
+            onChange={setMapType}
+            center={defaultCenter}
+          />
+        </>
       )}
     </div>
   );

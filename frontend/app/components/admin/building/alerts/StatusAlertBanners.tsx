@@ -156,7 +156,7 @@ export default function StatusAlertBanners({ status }: StatusAlertBannersProps) 
 
   return (
     <div className="space-y-3">
-      {/* BANNER 1: OFFLINE (เงียบเกิน 15 นาที) */}
+      {/* BANNER 1: OFFLINE (ขาดการส่งสัญญาณเป็นเวลานาน) */}
       {isOffline && (
         <div className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-xl text-red-900 shadow-sm">
           <div className="flex items-center gap-3">
@@ -176,7 +176,7 @@ export default function StatusAlertBanners({ status }: StatusAlertBannersProps) 
         </div>
       )}
 
-      {/* BANNER 2: ข้อมูลค้าง (เงียบ 1-14 นาที) กำลังวิเคราะห์ */}
+      {/* BANNER 2: ข้อมูลค้าง (กำลังรอข้อมูลใหม่) */}
       {isStale && (
         <div className="flex items-center justify-between p-4 bg-sky-50 border border-sky-200 rounded-xl text-sky-950 shadow-sm">
           <div className="flex items-center gap-3">
@@ -203,29 +203,29 @@ export default function StatusAlertBanners({ status }: StatusAlertBannersProps) 
         </div>
       )}
 
-      {/* BANNER 3: ZERO DATA / ไฟดับทุกเฟส (ข้อมูลสด) */}
+      {/* BANNER 3: ZERO DATA / ไฟดับทันทีเมื่อตรวจพบค่าไฟฟ้าเป็น 0 (ข้อมูลสด) */}
       {!isOffline && !isStale && isZeroData && (
-        <div className="flex items-center justify-between p-4 bg-sky-50 border border-sky-200 rounded-xl text-sky-950 shadow-sm">
+        <div className="flex items-center justify-between p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-950 shadow-sm">
           <div className="flex items-center gap-3">
-            <Loader2 className="text-sky-600 shrink-0 animate-spin" size={22} />
+            <ZapOff className="text-rose-600 shrink-0 animate-pulse" size={22} />
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h4 className="font-bold text-sm text-sky-900">
-                  🔍 ตรวจพบค่าไฟฟ้าเป็น 0 ทุกเฟส / ไม่มีโหลดเข้า
+                <h4 className="font-bold text-sm text-rose-900">
+                  ⚡ ตรวจพบเหตุการณ์ไฟดับ / ค่าไฟฟ้าเป็น 0 (Power Outage)
                 </h4>
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full border border-sky-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping" />
-                  กำลังวิเคราะห์เหตุการณ์...
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full border border-rose-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                  ตรวจพบทันที
                 </span>
               </div>
-              <p className="text-xs text-sky-700 mt-1">
-                <span className="font-semibold">ข้อสันนิษฐานเบื้องต้น:</span> ปิดสวิตช์เครื่องใช้ไฟฟ้าหลัก / เบรกเกอร์ทริป (Trip) / เซนเซอร์ตรวจวัดขัดข้อง
+              <p className="text-xs text-rose-700 mt-1">
+                ตรวจพบแรงดันหรือกระแสไฟฟ้าเป็น 0 ในระบบจริง (อัปเดตล่าสุด {lastTimeString})
               </p>
             </div>
           </div>
           <div className="text-right shrink-0 hidden sm:block">
-            <span className="text-xs font-medium text-sky-600 block">อัปเดตล่าสุด</span>
-            <span className="text-xs font-bold text-sky-900">{lastTimeString}</span>
+            <span className="text-xs font-medium text-rose-600 block">อัปเดตล่าสุด</span>
+            <span className="text-xs font-bold text-rose-900">{lastTimeString}</span>
           </div>
         </div>
       )}

@@ -77,7 +77,7 @@
 //   return <BuildingDetailClient building={building} devices={building.devices || []} />;
 // }
 
-
+///building/[id]/page.tsx(user)
 "use client";
 
 import React, { use, useEffect, useState } from "react";

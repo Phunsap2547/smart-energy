@@ -192,7 +192,7 @@ router.get('/', async (req, res) => {
     // Join ตาราง devices และ buildings ผ่าน Supabase Relation
     // ใช้ !inner เมื่อมีการกรองตาม building_id
     const deviceRelation = building_id ? 'devices!inner' : 'devices';
-    
+
     let query = supabase
       .from('anomalies')
       .select(`
@@ -220,6 +220,11 @@ router.get('/', async (req, res) => {
     if (severity) query = query.eq('severity', severity);
     if (device_id) query = query.eq('device_id', device_id);
     if (building_id) query = query.eq('devices.building_id', building_id);
+
+    // เพิ่มเงื่อนไขไม่เอาประเภทไฟตก
+    query = query
+      .neq('type', 'under_voltage')
+      .neq('type', 'undervoltage');
 
     const { data, error } = await query;
     if (error) throw error;
@@ -293,8 +298,8 @@ router.patch('/:id', async (req, res) => {
 
   const validStatuses = ['open', 'investigating', 'resolved', 'dismissed'];
   if (!status || !validStatuses.includes(status)) {
-    return res.status(400).json({ 
-      message: `สถานะไม่ถูกต้อง รองรับเฉพาะ: ${validStatuses.join(', ')}` 
+    return res.status(400).json({
+      message: `สถานะไม่ถูกต้อง รองรับเฉพาะ: ${validStatuses.join(', ')}`
     });
   }
 

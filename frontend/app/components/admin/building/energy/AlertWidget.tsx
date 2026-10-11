@@ -305,9 +305,9 @@ interface AlertWidgetProps {
 }
 
 // เกณฑ์วัดค่าแรงดันไฟฟ้า (ML Standard Thresholds)
-const VOLTAGE_OUTAGE_TH = 57.0; // < 57V = ไฟดับ
-const VOLTAGE_OVER_TH = 418.0;  // > 418V = ไฟเกิน
-const VOLTAGE_SAG_TH = 342.0;   // < 342V = ไฟตก / ไฟต่ำ
+const VOLTAGE_OUTAGE_TH = 57.0;  // < 57V = ไฟดับ
+const VOLTAGE_OVER_TH = 253.0;   // > 253V = ไฟเกิน (220V +10%)
+const VOLTAGE_UNDER_TH = 198.0;  // < 198V = ไฟต่ำ (220V -10%)
 
 export default function AlertWidget({
   buildingId,
@@ -411,6 +411,7 @@ export default function AlertWidget({
       const detectedAlerts: AlertItem[] = [];
 
       // --- 1. เช็กสถานะแรงดันไฟฟ้า (ML Voltage Detection) ---
+            // --- 1. เช็กสถานะแรงดันไฟฟ้า ---
       const voltage = Number(lastRecord.voltage_v ?? lastRecord.voltage_l1 ?? lastRecord.voltage ?? 0);
       if (voltage > 0) {
         if (voltage < VOLTAGE_OUTAGE_TH) {
@@ -429,13 +430,13 @@ export default function AlertWidget({
             time: timeString,
             detail: `แรงดันไฟฟ้าพุ่งสูงถึง ${voltage.toFixed(1)} V (เกินเกณฑ์ ${VOLTAGE_OVER_TH}V)`,
           });
-        } else if (voltage < VOLTAGE_SAG_TH) {
+        } else if (voltage < VOLTAGE_UNDER_TH) {
           detectedAlerts.push({
-            id: 'ml-voltage-sag',
+            id: 'ml-under-voltage',
             type: 'warning',
-            title: '📉 ไฟตก / 🔻 ไฟต่ำ (Voltage Sag / Undervoltage)',
+            title: '🔻 ไฟต่ำ (Under Voltage)',
             time: timeString,
-            detail: `แรงดันไฟฟ้าร่วงลงมาอยู่ที่ ${voltage.toFixed(1)} V (ต่ำกว่าเกณฑ์ ${VOLTAGE_SAG_TH}V)`,
+            detail: `แรงดันไฟฟ้าอยู่ที่ ${voltage.toFixed(1)} V (ต่ำกว่าเกณฑ์ ${VOLTAGE_UNDER_TH}V)`,
           });
         }
       }
@@ -519,7 +520,7 @@ export default function AlertWidget({
       }
 
       // บันทึกความผิดปกติลงตาราง anomalies เพื่อส่งไปหน้าประวัติ
-      saveToAnomalies(detectedAlerts, buildingId);
+      //saveToAnomalies(detectedAlerts, buildingId);
 
       setAlerts(detectedAlerts);
     } catch (err) {

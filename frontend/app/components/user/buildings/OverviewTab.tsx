@@ -41,6 +41,7 @@ interface Props {
   alerts: AlertRow[];
   alertsLoading: boolean;
   alertsError: boolean;
+  imageUrl?: string | null;
   onNavigateToAlerts: () => void;
 }
 
@@ -54,6 +55,7 @@ export default function OverviewTab({
   alerts,
   alertsLoading,
   alertsError,
+  imageUrl,
   onNavigateToAlerts,
 }: Props) {
   const {
@@ -85,11 +87,17 @@ export default function OverviewTab({
           <div
             className={`${H_TOP} relative overflow-hidden rounded-2xl border border-gray-200 bg-white ${CARD_SHADOW}`}
           >
-            <img
-              src="https://lh3.googleusercontent.com/gps-cs-s/AHRPTWkDTAjaNL0dew2Y_nVGAAv1MwnRweM8zhVcjBKOzDbsH8EyobxS1WL7r9GyRPRpP1VmtY9Iu7oxmscoDYp5Bjjn7sVVdVrfQDLuTO6Nt0ZnHTX60juvJgZxKwPpseNJJYQoT1yu=s680-w680-h510-rw"
-              alt={buildingName}
-              className="block h-full w-full object-cover"
-            />
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={buildingName}
+                className="block h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-gray-100 text-sm text-gray-400">
+                ยังไม่มีรูปอาคาร
+              </div>
+            )}
             <span className="absolute bottom-3 left-3 rounded-md bg-[rgba(18,24,31,0.8)] px-3 py-1.5 text-sm font-medium text-white backdrop-blur-sm">
               {buildingName}
             </span>

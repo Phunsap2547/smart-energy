@@ -9,7 +9,9 @@ export interface AlertRow {
   description?: string | null;
   status?: string | null; // open | investigating | resolved | dismissed
   created_at: string;
+  resolved_at?: string | null; // เวลาที่ worker ยืนยันว่าแรงดันกลับมาปกติ (null = ไม่ได้ปิดเพราะกลับปกติ)
   devices?: { id?: string | number; name?: string | null; building_id?: string | number | null } | null;
+  resolution_reason?: string | null; // recovered | superseded | offline
 }
 
 // ยังไม่ปิดเรื่อง = open หรือ investigating

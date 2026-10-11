@@ -19,7 +19,7 @@
 // }
 
 
-//alerts
+//app/admin/buildings/[id]/alerts/page.tsx
 'use client';
 
 import { use, useEffect, useState, useCallback } from 'react';

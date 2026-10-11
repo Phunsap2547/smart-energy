@@ -6,7 +6,7 @@ import L from "leaflet";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, FormEvent } from "react";
 import theme from "@/config/theme.js";
-import { UserCircle2, X, Settings2, Pencil, Trash2, Plus, ImagePlus } from "lucide-react";
+import { UserCircle2, X, Settings2, Pencil, Trash2, Plus, ImagePlus, Layers } from "lucide-react";
 import Link from 'next/link';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
@@ -23,7 +23,6 @@ const draftIcon = new L.Icon({
 });
 
 // ✅ สีตามสถานะ (key เป็นตัวพิมพ์เล็กให้ตรงกับค่าใน buildings.status)
-// ปรับสีตรงนี้ที่เดียว มีผลทั้งหมุดและ badge
 const STATUS_COLOR: Record<string, string> = {
   normal: "#16a34a",   // เขียว
   warning: "#f59e0b",  // ส้ม/เหลือง
@@ -62,6 +61,131 @@ const getPinIcon = (status?: string): L.DivIcon => {
   return iconCache[color];
 };
 
+// ---------------------------------------------------------------------------
+// ✅ ประเภทแผนที่ + ปุ่มสลับแบบกำหนดเอง (ใช้ Google Maps Tile Services)
+// ---------------------------------------------------------------------------
+type MapType = "road" | "satellite" | "hybrid";
+
+const MAP_TYPES: { key: MapType; label: string }[] = [
+  { key: "road", label: "แผนที่" },
+  { key: "satellite", label: "ดาวเทียม" },
+  { key: "hybrid", label: "ดาวเทียม+ชื่อ" },
+];
+
+// 🌐 URL สำหรับเรียกใช้งาน Tile ของ Google Maps
+const GOOGLE_ROADMAP = "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}";
+const GOOGLE_SATELLITE = "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}";
+const GOOGLE_HYBRID = "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}";
+
+// แปลงพิกัดเป็นเลขกระเบื้องแผนที่ (tile) เพื่อใช้เป็นภาพตัวอย่างบนปุ่ม
+function latLngToTile(lat: number, lng: number, z: number) {
+  const n = 2 ** z;
+  const x = Math.floor(((lng + 180) / 360) * n);
+  const latRad = (lat * Math.PI) / 180;
+  const y = Math.floor(
+    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n
+  );
+  return { x, y };
+}
+
+// ภาพตัวอย่างของแต่ละประเภท (ใช้กระเบื้องภาพจริงจาก Google Maps)
+function Thumb({
+  type,
+  center,
+}: {
+  type: MapType;
+  center: [number, number];
+}) {
+  const z = 16;
+  const { x, y } = latLngToTile(center[0], center[1], z);
+  const road = `https://mt1.google.com/vt/lyrs=m&x=${x}&y=${y}&z=${z}`;
+  const sat = `https://mt1.google.com/vt/lyrs=s&x=${x}&y=${y}&z=${z}`;
+  const hybrid = `https://mt1.google.com/vt/lyrs=y&x=${x}&y=${y}&z=${z}`;
+  const cls = "absolute inset-0 w-full h-full object-cover";
+
+  return (
+    <div className="absolute inset-0 bg-gray-200">
+      {type === "road" && <img src={road} alt="" className={cls} />}
+      {type === "satellite" && <img src={sat} alt="" className={cls} />}
+      {type === "hybrid" && <img src={hybrid} alt="" className={cls} />}
+    </div>
+  );
+}
+
+function MapTypeSwitcher({
+  value,
+  onChange,
+  center,
+}: {
+  value: MapType;
+  onChange: (t: MapType) => void;
+  center: [number, number];
+}) {
+  const [open, setOpen] = useState(false);
+  const current = MAP_TYPES.find((m) => m.key === value)!;
+
+  return (
+    <div className="absolute left-4 bottom-8 z-[1000] flex items-end gap-3">
+      {/* ปุ่มใหญ่: แสดงประเภทที่เลือกอยู่ */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="เปลี่ยนประเภทแผนที่"
+        className="relative w-[88px] h-[88px] rounded-2xl overflow-hidden border-[3px] border-white shadow-xl transition-transform hover:scale-105 shrink-0"
+      >
+        <Thumb type={value} center={center} />
+        <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent pt-5 pb-1.5 text-white text-sm font-semibold text-center">
+          {current.label}
+        </span>
+      </button>
+
+      {/* แผงตัวเลือก: ขยายออกมาด้านขวาของปุ่ม */}
+      {open && (
+        <div className="flex items-start gap-3 bg-white rounded-2xl shadow-xl p-3">
+          {MAP_TYPES.map((m) => {
+            const active = m.key === value;
+            return (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => {
+                  onChange(m.key);
+                  setOpen(false);
+                }}
+                className="flex flex-col items-center gap-1.5 group"
+              >
+                <div
+                  className={`relative w-[72px] h-[72px] rounded-xl overflow-hidden border-[3px] transition ${
+                    active
+                      ? "border-blue-500"
+                      : "border-transparent group-hover:border-gray-300"
+                  }`}
+                >
+                  <Thumb type={m.key} center={center} />
+                </div>
+                <span
+                  className={`text-xs text-center leading-tight max-w-[76px] ${
+                    active ? "text-blue-600 font-semibold" : "text-gray-700"
+                  }`}
+                >
+                  {m.label}
+                </span>
+              </button>
+            );
+          })}
+
+          <div className="flex flex-col items-center gap-1.5 opacity-40 select-none">
+            <div className="w-[72px] h-[72px] rounded-xl bg-gray-100 flex items-center justify-center">
+              <Layers size={26} className="text-gray-700" />
+            </div>
+            <span className="text-xs text-gray-700">เพิ่มเติม</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface Building {
   id: number;
   name: string;
@@ -91,7 +215,7 @@ function LocationPicker({
   return null;
 }
 
-// เลื่อน/ซูมแผนที่ไปหาตำแหน่งอาคารอัตโนมัติ หลังโหลดข้อมูลเสร็จ (ทำครั้งเดียวตอนข้อมูลมาถึง)
+// เลื่อน/ซูมแผนที่ไปหาตำแหน่งอาคารอัตโนมัติ หลังโหลดข้อมูลเสร็จ
 function MapAutoFit({ buildings }: { buildings: Building[] }) {
   const map = useMap();
   const [hasFitted, setHasFitted] = useState(false);
@@ -124,6 +248,9 @@ export default function AdminMapView() {
 
   const [panelOpen, setPanelOpen] = useState(false);
 
+  // ✅ ประเภทแผนที่ที่เลือก (ถนน / ดาวเทียม / ดาวเทียม+ชื่อ)
+  const [mapType, setMapType] = useState<MapType>("road");
+
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -143,8 +270,6 @@ export default function AdminMapView() {
     return localStorage.getItem("adminToken");
   };
 
-  // ดึงข้อมูลอาคารจาก API เดียวกับที่ฟอร์มใช้บันทึก — ทำให้แผนที่กับแผงซิงค์กันเสมอ
-  // silent = true ใช้ตอนรีเฟรชเบื้องหลัง (ไม่โชว์ loading / error)
   const fetchBuildings = async (silent = false) => {
     const token = getToken();
     if (!token) {
@@ -175,7 +300,6 @@ export default function AdminMapView() {
     }
   };
 
-  // --- เพิ่มใน อัปรูป ---
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(
     form.image_url || null
@@ -188,7 +312,6 @@ export default function AdminMapView() {
     setImagePreview(URL.createObjectURL(file));
   };
 
-  // โหลดทันทีตอนเข้าเพจ + ✅ รีเฟรชสถานะเบื้องหลังทุก 30 วินาที สีหมุดจะเปลี่ยนเองเมื่อสถานะอาคารเปลี่ยน
   useEffect(() => {
     fetchBuildings();
     const timer = setInterval(() => fetchBuildings(true), 30000);
@@ -230,20 +353,24 @@ export default function AdminMapView() {
   };
 
   async function uploadBuildingImage(file: File): Promise<string> {
-    const formData = new FormData();
-    formData.append("file", file);
+  const formData = new FormData();
+  formData.append("file", file);
 
-    const token = getToken();
-    const res = await fetch(`${API_URL}/api/admin/upload`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData,
-    });
+  const token = getToken();
+  const res = await fetch(`${API_URL}/api/admin/upload`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
 
-    if (!res.ok) throw new Error("อัปโหลดรูปไม่สำเร็จ");
-    const data = await res.json();
-    return data.url;
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("Upload failed:", res.status, body);
+    throw new Error(body.message || `อัปโหลดรูปไม่สำเร็จ (${res.status})`);
   }
+  const data = await res.json();
+  return data.url;
+}
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -337,6 +464,13 @@ export default function AdminMapView() {
   const isEditing = editingId !== null;
   const hasDraftLocation = panelOpen && form.lat !== "" && form.lng !== "";
 
+  const firstValid = buildings.find(
+    (b) => b && b.lat != null && b.lng != null && !isNaN(Number(b.lat)) && !isNaN(Number(b.lng))
+  );
+  const thumbCenter: [number, number] = firstValid
+    ? [Number(firstValid.lat), Number(firstValid.lng)]
+    : DEFAULT_CENTER;
+
   return (
     <div className="w-full h-screen relative overflow-hidden">
       {/* Topbar ลอยด้านบนแผนที่ */}
@@ -390,13 +524,39 @@ export default function AdminMapView() {
       <MapContainer
         center={DEFAULT_CENTER}
         zoom={13}
+        maxZoom={20}
         scrollWheelZoom={true}
         className="w-full h-full"
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        {/* 📍 แผนที่ถนน Google Maps */}
+        {mapType === "road" && (
+          <TileLayer
+            key="google-road"
+            attribution="&copy; Google Maps"
+            url={GOOGLE_ROADMAP}
+            maxZoom={20}
+          />
+        )}
+
+        {/* 🛰️ ภาพดาวเทียม Google Maps */}
+        {mapType === "satellite" && (
+          <TileLayer
+            key="google-satellite"
+            attribution="&copy; Google Maps"
+            url={GOOGLE_SATELLITE}
+            maxZoom={20}
+          />
+        )}
+
+        {/* 🏷️ ภาพดาวเทียม + ป้ายชื่อสถานที่ Google Maps */}
+        {mapType === "hybrid" && (
+          <TileLayer
+            key="google-hybrid"
+            attribution="&copy; Google Maps"
+            url={GOOGLE_HYBRID}
+            maxZoom={20}
+          />
+        )}
 
         <LocationPicker active={panelOpen} onPick={handlePickLocation} />
 
@@ -447,6 +607,13 @@ export default function AdminMapView() {
           </Marker>
         )}
       </MapContainer>
+
+      {/* ปุ่มสลับประเภทแผนที่ */}
+      <MapTypeSwitcher
+        value={mapType}
+        onChange={setMapType}
+        center={thumbCenter}
+      />
 
       {/* Overlay มืดด้านหลัง เมื่อเปิด Drawer */}
       <div

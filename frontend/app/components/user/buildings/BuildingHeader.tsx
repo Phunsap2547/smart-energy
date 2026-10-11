@@ -7,7 +7,7 @@ import Link from "next/link";
 import theme from "@/config/theme.js";
 import type { BuildingTab, RangeMode } from "./types";
 
-const RANGES: RangeMode[] = ["Day", "Month", "Year", "Total"];
+const RANGES: RangeMode[] = ["Day", "Month", "Year",];
 
 // ✅ นาฬิกาแสดงวัน เวลาปัจจุบัน (เวลาไทย) อัปเดตทุกวินาที
 function LiveClock() {

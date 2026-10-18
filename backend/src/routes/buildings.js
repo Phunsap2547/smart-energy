@@ -1,3 +1,4 @@
+//routes/buildings.js
 const express = require('express');
 const supabase = require('../supabase');
 const router = express.Router();
@@ -10,7 +11,7 @@ router.get('/', async (req, res) => {
     let query = supabase.from('buildings').select('*').order('name', { ascending: true });
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,location.ilike.%${search}%`);
+      query = query.ilike('name', `%${search}%`);
     }
 
     const { data, error } = await query;

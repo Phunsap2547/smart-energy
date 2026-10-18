@@ -44,6 +44,11 @@ export interface EnergyIngest {
   thd_current_l2_pct?: number;
   thd_current_l3_pct?: number;
 
+  voltage_min?: number;
+  voltage_max?: number;
+current_max?: number;
+pf_min?: number;
+
   //daily_energy_kwh?: number | null;
 }
 

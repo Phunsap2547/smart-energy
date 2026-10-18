@@ -1,40 +1,77 @@
+// //login/admin
+// "use client";
 
+// import React, { useState, FormEvent } from "react";
+// import Link from "next/link";
+// import { useRouter } from "next/navigation";
+// import { Building2, User, Lock, Eye, EyeOff } from "lucide-react";
+
+// /**
+//  * LoginPage
+//  * หน้า Login สำหรับระบบตรวจวัดพลังงานไฟฟ้าในอาคาร (มหาวิทยาลัย)
+//  */
+
+// // ปรับ URL Endpoint ให้ตรงกับ Express Backend (กรณีใช้ Next.js Rewrite หรือ Proxy สามารถใช้ "/api/auth/login" ได้)
+// const LOGIN_ENDPOINT = process.env.NEXT_PUBLIC_API_URL 
+//   ? `${process.env.NEXT_PUBLIC_API_URL}/api/admin/login`
+//   : "http://localhost:5000/api/admin/login";
+
+// export interface LoginUser {
+//   id: string | number;
+//   username: string;
+//   email?: string;
+//   role?: string;
+//   [key: string]: unknown;
+// }
+
+// interface LoginResponse {
+//   token?: string;
+//   user?: LoginUser;
+//   message?: string;
+// }
+
+// export interface LoginPageProps {
+//   onLoginSuccess?: (user: LoginUser) => void;
+// }
+
+// export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
+//   const router = useRouter();
+//   const [username, setUsername] = useState<string>("");
+//   const [password, setPassword] = useState<string>("");
+//   const [showPassword, setShowPassword] = useState<boolean>(false);
+//   const [isLoading, setIsLoading] = useState<boolean>(false);
+//   const [error, setError] = useState<string>("");
+
+//   const finishLogin = (data: LoginResponse) => {
+//     if (data.token) {
+//       localStorage.setItem("adminToken", data.token);
+//     }
+    
+//     // เรียก callback หากมีการส่ง props เข้ามา
+//     if (data.user) {
+//       onLoginSuccess?.(data.user);
+//     }
+
+//     // เปลี่ยนหน้าไปยัง Dashboard หลัง Login สำเร็จ
+//     router.push("/admin");
+//   };
 "use client";
 
 import React, { useState, FormEvent } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Building2, User, Lock, Eye, EyeOff } from "lucide-react";
+import { TOKEN_KEY } from "@/lib/api";
 
-/**
- * LoginPage
- * หน้า Login สำหรับระบบตรวจวัดพลังงานไฟฟ้าในอาคาร (มหาวิทยาลัย)
- */
-
-// ปรับ URL Endpoint ให้ตรงกับ Express Backend (กรณีใช้ Next.js Rewrite หรือ Proxy สามารถใช้ "/api/auth/login" ได้)
-const LOGIN_ENDPOINT = process.env.NEXT_PUBLIC_API_URL 
-  ? `${process.env.NEXT_PUBLIC_API_URL}/api/admin/login`
-  : "http://localhost:5000/api/admin/login";
-
-export interface LoginUser {
-  id: string | number;
-  username: string;
-  email?: string;
-  role?: string;
-  [key: string]: unknown;
-}
+const LOGIN_ENDPOINT = `${
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+}/api/admin/login`;
 
 interface LoginResponse {
   token?: string;
-  user?: LoginUser;
   message?: string;
 }
 
-export interface LoginPageProps {
-  onLoginSuccess?: (user: LoginUser) => void;
-}
-
-export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
+export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -43,17 +80,12 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [error, setError] = useState<string>("");
 
   const finishLogin = (data: LoginResponse) => {
-    if (data.token) {
-      localStorage.setItem("adminToken", data.token);
+    if (!data.token) {
+      setError("ไม่ได้รับ token จากเซิร์ฟเวอร์ กรุณาลองใหม่");
+      return;
     }
-    
-    // เรียก callback หากมีการส่ง props เข้ามา
-    if (data.user) {
-      onLoginSuccess?.(data.user);
-    }
-
-    // เปลี่ยนหน้าไปยัง Dashboard หลัง Login สำเร็จ
-    router.push("/admin");
+    localStorage.setItem(TOKEN_KEY, data.token);
+    router.replace("/admin");
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -236,7 +268,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 </p>
               )}
 
-              <div className="text-right -mt-2">
+              {/* <div className="text-right -mt-2">
                 <button
                   type="button"
                   className="text-sm text-[#46685B] hover:text-[#0E2A22] hover:underline"
@@ -244,7 +276,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 >
                   ลืมรหัสผ่าน?
                 </button>
-              </div>
+              </div> */}
 
               <button
                 type="submit"

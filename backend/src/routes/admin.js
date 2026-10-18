@@ -88,17 +88,23 @@
 //   }
 // });
 
-
+//backend/src/routes/admin.js
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const supabase = require('../supabase');
 const authenticateAdmin = require('../middleware/auth');
-
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 นาที
+  max: 10,                  // ผิดได้ 10 ครั้งต่อ IP
+  message: { message: 'พยายามเข้าสู่ระบบมากเกินไป กรุณาลองใหม่ใน 15 นาที' },
+});
+
 // POST /api/admin/login
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -141,7 +147,7 @@ router.get('/me', authenticateAdmin, (req, res) => {
 });
 
 // POST /api/admin/register
-router.post('/register', async (req, res) => {
+router.post('/register', authenticateAdmin, async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {

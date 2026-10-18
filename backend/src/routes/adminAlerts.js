@@ -166,6 +166,315 @@
 
 // module.exports = router;
 
+// // routes/adminAlerts.js
+// router.get('/', async (req, res) => {
+//   const { status, severity, device_id, building_id, limit = 50, page = 1 } = req.query;
+
+//   try {
+//     const safeLimit = Math.min(parseInt(limit, 10) || 50, 500);
+//     const currentPage = Math.max(parseInt(page, 10) || 1, 1);
+//     const offset = (currentPage - 1) * safeLimit;
+
+//     const deviceRelation = building_id ? 'devices!inner' : 'devices';
+
+//     let query = supabase
+//       .from('anomalies')
+//       .select(`
+//         id,
+//         device_id,
+//         type,
+//         severity,
+//         description,
+//         status,
+//         created_at,
+//         resolved_at,
+//         resolution_reason,
+//         ${deviceRelation} (
+//           id,
+//           name,
+//           building_id,
+//           buildings (
+//             id,
+//             name
+//           )
+//         )
+//       `)
+//       .order('created_at', { ascending: false })
+//       .range(offset, offset + safeLimit - 1);
+
+//     if (status) query = query.eq('status', status);
+//     if (severity) query = query.eq('severity', severity);
+//     if (device_id) query = query.eq('device_id', device_id);
+//     if (building_id) query = query.eq('devices.building_id', building_id);
+
+//     // เอาตัวกรอง under_voltage ออกแล้ว เพื่อให้ตรงกับหน้า admin ที่แสดง "ไฟต่ำ"
+//     // ถ้าต้องการซ่อนไฟต่ำจริง ๆ ให้ใส่กลับ:
+//     // query = query.neq('type', 'under_voltage').neq('type', 'undervoltage');
+
+//     const { data, error } = await query;
+//     if (error) throw error;
+
+//     const formattedData = (data || []).map((item) => ({
+//       id: item.id,
+//       device_id: item.device_id,
+//       device_name: item.devices?.name || null,
+//       building_id: item.devices?.buildings?.id || item.devices?.building_id || null,
+//       building_name: item.devices?.buildings?.name || null,
+//       type: item.type,
+//       severity: item.severity,
+//       description: item.description,
+//       status: item.status,
+//       created_at: item.created_at,
+//       resolved_at: item.resolved_at,
+//       resolution_reason: item.resolution_reason,
+//     }));
+
+//     res.json(formattedData);
+//   } catch (err) {
+//     console.error('❌ Error in GET /api/admin/alerts:', err);
+//     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงข้อมูลการแจ้งเตือน', error: err.message });
+//   }
+// });
+// // const express = require('express');
+// // const { createClient } = require('@supabase/supabase-js');
+// // // const authenticateAdmin = require('../middleware/adminAuth'); // มิดเดิลแวร์ตรวจ Auth (ถ้ามี)
+
+// // const router = express.Router();
+
+// // // สร้าง Supabase Client
+// // const supabaseUrl = process.env.SUPABASE_URL;
+// // const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+// // const supabase = createClient(supabaseUrl, supabaseKey);
+
+// // // -----------------------------------------------------------------------------
+// // // GET /api/admin/alerts — ดึงรายการความผิดปกติ (พร้อม Filter, Pagination และ Join Table)
+// // // -----------------------------------------------------------------------------
+// // router.get('/', async (req, res) => {
+// //   const { status, severity, device_id, building_id, limit = 50, page = 1 } = req.query;
+
+// //   try {
+// //     const safeLimit = Math.min(parseInt(limit, 10) || 50, 200);
+// //     const currentPage = Math.max(parseInt(page, 10) || 1, 1);
+// //     const offset = (currentPage - 1) * safeLimit;
+
+// //     // Join ตาราง devices และ buildings ผ่าน Supabase Relation
+// //     // ใช้ !inner เมื่อมีการกรองตาม building_id
+// //     const deviceRelation = building_id ? 'devices!inner' : 'devices';
+
+// //     let query = supabase
+// //       .from('anomalies')
+// //       .select(`
+// //         id,
+// //         device_id,
+// //         type,
+// //         severity,
+// //         description,
+// //         status,
+// //         created_at,
+// //         ${deviceRelation} (
+// //           id,
+// //           name,
+// //           building_id,
+// //           buildings (
+// //             id,
+// //             name
+// //           )
+// //         )
+// //       `)
+// //       .order('created_at', { ascending: false })
+// //       .range(offset, offset + safeLimit - 1);
+
+// //     if (status) query = query.eq('status', status);
+// //     if (severity) query = query.eq('severity', severity);
+// //     if (device_id) query = query.eq('device_id', device_id);
+// //     if (building_id) query = query.eq('devices.building_id', building_id);
+
+// //     // เพิ่มเงื่อนไขไม่เอาประเภทไฟตก
+// //     query = query
+// //       .neq('type', 'under_voltage')
+// //       .neq('type', 'undervoltage');
+
+// //     const { data, error } = await query;
+// //     if (error) throw error;
+
+// //     // Map ผลลัพธ์ให้เป็น Object เรียบ (Flatten) ตรงกับโครงสร้าง SQL เดิม
+// //     const formattedData = (data || []).map(item => ({
+// //       id: item.id,
+// //       device_id: item.device_id,
+// //       device_name: item.devices?.name || null,
+// //       building_id: item.devices?.buildings?.id || item.devices?.building_id || null,
+// //       building_name: item.devices?.buildings?.name || null,
+// //       type: item.type,
+// //       severity: item.severity,
+// //       description: item.description,
+// //       status: item.status,
+// //       created_at: item.created_at,
+// //     }));
+
+// //     res.json(formattedData);
+// //   } catch (err) {
+// //     console.error('❌ Error in GET /api/admin/alerts:', err);
+// //     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงข้อมูลการแจ้งเตือน', error: err.message });
+// //   }
+// // });
+
+// // -----------------------------------------------------------------------------
+// // GET /api/admin/alerts/stats — สรุปสถิติการแจ้งเตือนสำหรับ Dashboard Cards
+// // -----------------------------------------------------------------------------
+// // router.get('/stats', async (req, res) => {
+// //   try {
+// //     const todayStr = new Date().toISOString().split('T')[0];
+
+// //     // รัน Query สถิติพร้อมกันแบบ Parallel ด้วย Promise.all
+// //     const [
+// //       { count: openTotal, error: err1 },
+// //       { count: openCritical, error: err2 },
+// //       { count: openHigh, error: err3 },
+// //       { count: openWarning, error: err4 },
+// //       { count: resolvedToday, error: err5 }
+// //     ] = await Promise.all([
+// //       supabase.from('anomalies').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+// //       supabase.from('anomalies').select('*', { count: 'exact', head: true }).eq('status', 'open').eq('severity', 'critical'),
+// //       supabase.from('anomalies').select('*', { count: 'exact', head: true }).eq('status', 'open').eq('severity', 'high'),
+// //       supabase.from('anomalies').select('*', { count: 'exact', head: true }).eq('status', 'open').eq('severity', 'warning'),
+// //       supabase.from('anomalies').select('*', { count: 'exact', head: true }).eq('status', 'resolved').gte('created_at', `${todayStr}T00:00:00`)
+// //     ]);
+
+// //     if (err1 || err2 || err3 || err4 || err5) {
+// //       throw err1 || err2 || err3 || err4 || err5;
+// //     }
+
+// //     res.json({
+// //       open_total: openTotal || 0,
+// //       open_critical: openCritical || 0,
+// //       open_high: openHigh || 0,
+// //       open_warning: openWarning || 0,
+// //       resolved_today: resolvedToday || 0,
+// //     });
+// //   } catch (err) {
+// //     console.error('❌ Error in GET /api/admin/alerts/stats:', err);
+// //     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการคำนวณสถิติ', error: err.message });
+// //   }
+// // });
+// router.get('/stats', async (req, res) => {
+//   const { building_id } = req.query;
+//   try {
+//     const todayStr = new Date(Date.now() + 7 * 3600 * 1000).toISOString().split('T')[0];
+
+//     const count = (status, severity) => {
+//       let q = supabase
+//         .from('anomalies')
+//         .select(building_id ? 'id, devices!inner(building_id)' : 'id', { count: 'exact', head: true })
+//         .eq('status', status);
+//       if (severity) q = q.eq('severity', severity);
+//       if (building_id) q = q.eq('devices.building_id', building_id);
+//       return q;
+//     };
+
+//     const [a, b, c, d, e] = await Promise.all([
+//       count('open'),
+//       count('open', 'critical'),
+//       count('open', 'high'),
+//       count('open', 'warning'),
+//       count('resolved').gte('created_at', `${todayStr}T00:00:00+07:00`),
+//     ]);
+
+//     const err = [a, b, c, d, e].find((r) => r.error)?.error;
+//     if (err) throw err;
+
+//     res.json({
+//       open_total: a.count || 0,
+//       open_critical: b.count || 0,
+//       open_high: c.count || 0,
+//       open_warning: d.count || 0,
+//       resolved_today: e.count || 0,
+//     });
+//   } catch (err) {
+//     console.error('❌ Error in GET /api/admin/alerts/stats:', err);
+//     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการคำนวณสถิติ', error: err.message });
+//   }
+// });
+// // -----------------------------------------------------------------------------
+// // PATCH /api/admin/alerts/:id — อัปเดตสถานะ Anomaly และอัปเดตสถานะอาคาร
+// // -----------------------------------------------------------------------------
+// router.patch('/:id', async (req, res) => {
+//   const { id } = req.params;
+//   const { status } = req.body; // 'open', 'investigating', 'resolved', 'dismissed'
+
+//   const validStatuses = ['open', 'investigating', 'resolved', 'dismissed'];
+//   if (!status || !validStatuses.includes(status)) {
+//     return res.status(400).json({
+//       message: `สถานะไม่ถูกต้อง รองรับเฉพาะ: ${validStatuses.join(', ')}`
+//     });
+//   }
+
+//   try {
+//     // 1. อัปเดตสถานะของ Anomaly
+//     const { data: updatedAnomaly, error: updateErr } = await supabase
+//       .from('anomalies')
+//       .update({ status })
+//       .eq('id', id)
+//       .select()
+//       .maybeSingle();
+
+//     if (updateErr) throw updateErr;
+//     if (!updatedAnomaly) {
+//       return res.status(404).json({ message: 'ไม่พบรายการแจ้งเตือนที่ระบุ' });
+//     }
+
+//     // 2. คำนวณเพื่ออัปเดตสถานะของอาคาร (Building Status) ใหม่
+//     if (updatedAnomaly.device_id) {
+//       const { data: deviceData } = await supabase
+//         .from('devices')
+//         .select('building_id')
+//         .eq('id', updatedAnomaly.device_id)
+//         .maybeSingle();
+
+//       const buildingId = deviceData?.building_id;
+
+//       if (buildingId) {
+//         // ดึง Anomaly ทั้งหมดของอาคารที่ยังคงสถานะ 'open' อยู่
+//         const { data: activeAnomalies } = await supabase
+//           .from('anomalies')
+//           .select('severity, devices!inner(building_id)')
+//           .eq('devices.building_id', buildingId)
+//           .eq('status', 'open');
+
+//         // หา Severity ที่แย่ที่สุด
+//         let maxRank = 0;
+//         const severityRank = { 'warning': 1, 'high': 2, 'critical': 3 };
+
+//         (activeAnomalies || []).forEach(a => {
+//           const rank = severityRank[a.severity] || 0;
+//           if (rank > maxRank) maxRank = rank;
+//         });
+
+//         const rankToBuildingStatus = { 0: 'normal', 1: 'warning', 2: 'warning', 3: 'critical' };
+//         const newBuildingStatus = rankToBuildingStatus[maxRank] || 'normal';
+
+//         // อัปเดตตาราง buildings
+//         await supabase
+//           .from('buildings')
+//           .update({ status: newBuildingStatus })
+//           .eq('id', buildingId);
+//       }
+//     }
+
+//     return res.json({
+//       message: 'อัปเดตสถานะการแจ้งเตือนสำเร็จ',
+//       anomaly: updatedAnomaly
+//     });
+
+//   } catch (err) {
+//     console.error('❌ Error in PATCH /api/admin/alerts/:id:', err);
+//     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการอัปเดตสถานะ', error: err.message });
+//   }
+// });
+
+// module.exports = router;
+
+
+
 // routes/adminAlerts.js
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
@@ -173,24 +482,21 @@ const { createClient } = require('@supabase/supabase-js');
 
 const router = express.Router();
 
-// สร้าง Supabase Client
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // -----------------------------------------------------------------------------
-// GET /api/admin/alerts — ดึงรายการความผิดปกติ (พร้อม Filter, Pagination และ Join Table)
+// GET /api/admin/alerts — ดึงรายการความผิดปกติ (Filter, Pagination, Join)
 // -----------------------------------------------------------------------------
 router.get('/', async (req, res) => {
   const { status, severity, device_id, building_id, limit = 50, page = 1 } = req.query;
 
   try {
-    const safeLimit = Math.min(parseInt(limit, 10) || 50, 200);
+    const safeLimit = Math.min(parseInt(limit, 10) || 50, 500);
     const currentPage = Math.max(parseInt(page, 10) || 1, 1);
     const offset = (currentPage - 1) * safeLimit;
 
-    // Join ตาราง devices และ buildings ผ่าน Supabase Relation
-    // ใช้ !inner เมื่อมีการกรองตาม building_id
     const deviceRelation = building_id ? 'devices!inner' : 'devices';
 
     let query = supabase
@@ -203,6 +509,8 @@ router.get('/', async (req, res) => {
         description,
         status,
         created_at,
+        resolved_at,
+        resolution_reason,
         ${deviceRelation} (
           id,
           name,
@@ -221,16 +529,10 @@ router.get('/', async (req, res) => {
     if (device_id) query = query.eq('device_id', device_id);
     if (building_id) query = query.eq('devices.building_id', building_id);
 
-    // เพิ่มเงื่อนไขไม่เอาประเภทไฟตก
-    query = query
-      .neq('type', 'under_voltage')
-      .neq('type', 'undervoltage');
-
     const { data, error } = await query;
     if (error) throw error;
 
-    // Map ผลลัพธ์ให้เป็น Object เรียบ (Flatten) ตรงกับโครงสร้าง SQL เดิม
-    const formattedData = (data || []).map(item => ({
+    const formattedData = (data || []).map((item) => ({
       id: item.id,
       device_id: item.device_id,
       device_name: item.devices?.name || null,
@@ -241,6 +543,8 @@ router.get('/', async (req, res) => {
       description: item.description,
       status: item.status,
       created_at: item.created_at,
+      resolved_at: item.resolved_at,
+      resolution_reason: item.resolution_reason,
     }));
 
     res.json(formattedData);
@@ -251,37 +555,40 @@ router.get('/', async (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
-// GET /api/admin/alerts/stats — สรุปสถิติการแจ้งเตือนสำหรับ Dashboard Cards
+// GET /api/admin/alerts/stats — สรุปสถิติสำหรับ Dashboard Cards
 // -----------------------------------------------------------------------------
 router.get('/stats', async (req, res) => {
+  const { building_id } = req.query;
   try {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = new Date(Date.now() + 7 * 3600 * 1000).toISOString().split('T')[0];
 
-    // รัน Query สถิติพร้อมกันแบบ Parallel ด้วย Promise.all
-    const [
-      { count: openTotal, error: err1 },
-      { count: openCritical, error: err2 },
-      { count: openHigh, error: err3 },
-      { count: openWarning, error: err4 },
-      { count: resolvedToday, error: err5 }
-    ] = await Promise.all([
-      supabase.from('anomalies').select('*', { count: 'exact', head: true }).eq('status', 'open'),
-      supabase.from('anomalies').select('*', { count: 'exact', head: true }).eq('status', 'open').eq('severity', 'critical'),
-      supabase.from('anomalies').select('*', { count: 'exact', head: true }).eq('status', 'open').eq('severity', 'high'),
-      supabase.from('anomalies').select('*', { count: 'exact', head: true }).eq('status', 'open').eq('severity', 'warning'),
-      supabase.from('anomalies').select('*', { count: 'exact', head: true }).eq('status', 'resolved').gte('created_at', `${todayStr}T00:00:00`)
+    const count = (status, severity) => {
+      let q = supabase
+        .from('anomalies')
+        .select(building_id ? 'id, devices!inner(building_id)' : 'id', { count: 'exact', head: true })
+        .eq('status', status);
+      if (severity) q = q.eq('severity', severity);
+      if (building_id) q = q.eq('devices.building_id', building_id);
+      return q;
+    };
+
+    const [a, b, c, d, e] = await Promise.all([
+      count('open'),
+      count('open', 'critical'),
+      count('open', 'high'),
+      count('open', 'warning'),
+      count('resolved').gte('created_at', `${todayStr}T00:00:00+07:00`),
     ]);
 
-    if (err1 || err2 || err3 || err4 || err5) {
-      throw err1 || err2 || err3 || err4 || err5;
-    }
+    const err = [a, b, c, d, e].find((r) => r.error)?.error;
+    if (err) throw err;
 
     res.json({
-      open_total: openTotal || 0,
-      open_critical: openCritical || 0,
-      open_high: openHigh || 0,
-      open_warning: openWarning || 0,
-      resolved_today: resolvedToday || 0,
+      open_total: a.count || 0,
+      open_critical: b.count || 0,
+      open_high: c.count || 0,
+      open_warning: d.count || 0,
+      resolved_today: e.count || 0,
     });
   } catch (err) {
     console.error('❌ Error in GET /api/admin/alerts/stats:', err);
@@ -290,7 +597,7 @@ router.get('/stats', async (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
-// PATCH /api/admin/alerts/:id — อัปเดตสถานะ Anomaly และอัปเดตสถานะอาคาร
+// PATCH /api/admin/alerts/:id — อัปเดตสถานะ Anomaly และสถานะอาคาร
 // -----------------------------------------------------------------------------
 router.patch('/:id', async (req, res) => {
   const { id } = req.params;
@@ -299,12 +606,11 @@ router.patch('/:id', async (req, res) => {
   const validStatuses = ['open', 'investigating', 'resolved', 'dismissed'];
   if (!status || !validStatuses.includes(status)) {
     return res.status(400).json({
-      message: `สถานะไม่ถูกต้อง รองรับเฉพาะ: ${validStatuses.join(', ')}`
+      message: `สถานะไม่ถูกต้อง รองรับเฉพาะ: ${validStatuses.join(', ')}`,
     });
   }
 
   try {
-    // 1. อัปเดตสถานะของ Anomaly
     const { data: updatedAnomaly, error: updateErr } = await supabase
       .from('anomalies')
       .update({ status })
@@ -317,7 +623,6 @@ router.patch('/:id', async (req, res) => {
       return res.status(404).json({ message: 'ไม่พบรายการแจ้งเตือนที่ระบุ' });
     }
 
-    // 2. คำนวณเพื่ออัปเดตสถานะของอาคาร (Building Status) ใหม่
     if (updatedAnomaly.device_id) {
       const { data: deviceData } = await supabase
         .from('devices')
@@ -328,18 +633,16 @@ router.patch('/:id', async (req, res) => {
       const buildingId = deviceData?.building_id;
 
       if (buildingId) {
-        // ดึง Anomaly ทั้งหมดของอาคารที่ยังคงสถานะ 'open' อยู่
         const { data: activeAnomalies } = await supabase
           .from('anomalies')
           .select('severity, devices!inner(building_id)')
           .eq('devices.building_id', buildingId)
           .eq('status', 'open');
 
-        // หา Severity ที่แย่ที่สุด
         let maxRank = 0;
-        const severityRank = { 'warning': 1, 'high': 2, 'critical': 3 };
+        const severityRank = { warning: 1, high: 2, critical: 3 };
 
-        (activeAnomalies || []).forEach(a => {
+        (activeAnomalies || []).forEach((a) => {
           const rank = severityRank[a.severity] || 0;
           if (rank > maxRank) maxRank = rank;
         });
@@ -347,7 +650,6 @@ router.patch('/:id', async (req, res) => {
         const rankToBuildingStatus = { 0: 'normal', 1: 'warning', 2: 'warning', 3: 'critical' };
         const newBuildingStatus = rankToBuildingStatus[maxRank] || 'normal';
 
-        // อัปเดตตาราง buildings
         await supabase
           .from('buildings')
           .update({ status: newBuildingStatus })
@@ -357,9 +659,8 @@ router.patch('/:id', async (req, res) => {
 
     return res.json({
       message: 'อัปเดตสถานะการแจ้งเตือนสำเร็จ',
-      anomaly: updatedAnomaly
+      anomaly: updatedAnomaly,
     });
-
   } catch (err) {
     console.error('❌ Error in PATCH /api/admin/alerts/:id:', err);
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการอัปเดตสถานะ', error: err.message });

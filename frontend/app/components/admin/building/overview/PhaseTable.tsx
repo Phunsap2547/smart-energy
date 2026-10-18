@@ -792,7 +792,7 @@
 //   );
 // }
 
-// components/admin/building/phase/PhaseLineChart.tsx
+// components/admin/building/overview/PhaseTable.tsx
 "use client";
 
 import React from "react";
@@ -800,15 +800,15 @@ import { EnergyIngest } from "@/types/energy";
 import { formatNumber } from "@/lib/formatter";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { VoltageCfg, DEFAULT_VOLTAGE_CFG } from "@/lib/voltage";
 
 interface PhaseTableProps {
   latestData: EnergyIngest | null;
   isOffline?: boolean;
+  voltageCfg?: VoltageCfg; // ช่วงแรงดันปกติของอุปกรณ์ (จากตาราง devices)
 }
 
-// เกณฑ์ตรวจ (ปรับได้) — แรงดันใช้ช่วงเดียวกับแบนเนอร์ 220-240V
-const V_MIN = 220;
-const V_MAX = 240;
+// เกณฑ์ตรวจ (ปรับได้)
 const V_NO_SIGNAL = 22;   // ต่ำกว่านี้ถือว่าไม่มีแรงดัน/ไม่ได้ต่อเฟส
 const PF_MIN = 0.85;
 const CURRENT_MIN_FOR_PF = 0.1; // กระแสต่ำกว่านี้ PF ไม่มีความหมาย ไม่ตรวจ
@@ -824,7 +824,7 @@ type Raw = {
   thdI: number | null | undefined;
 };
 
-function analyze(p: Raw) {
+function analyze(p: Raw, vMin: number, vMax: number) {
   const v = p.voltage ?? null;
   const i = p.current ?? null;
   const pf = p.pf ?? null;
@@ -842,7 +842,7 @@ function analyze(p: Raw) {
   }
 
   const bad = {
-    v: v > V_MAX || v < V_MIN,
+    v: v > vMax || v < vMin,
     i: false,
     pf: pf !== null && (i ?? 0) >= CURRENT_MIN_FOR_PF && pf < PF_MIN,
     thdV: thdV !== null && thdV > THD_V_MAX,
@@ -850,8 +850,8 @@ function analyze(p: Raw) {
   };
 
   const reasons: string[] = [];
-  if (v > V_MAX) reasons.push(`แรงดันสูง ${formatNumber(v, 1)} V (เกิน ${V_MAX})`);
-  else if (v < V_MIN) reasons.push(`แรงดันต่ำ ${formatNumber(v, 1)} V (ต่ำกว่า ${V_MIN})`);
+  if (v > vMax) reasons.push(`แรงดันสูง ${formatNumber(v, 1)} V (เกิน ${vMax})`);
+  else if (v < vMin) reasons.push(`แรงดันต่ำ ${formatNumber(v, 1)} V (ต่ำกว่า ${vMin})`);
   if (bad.pf) reasons.push(`PF ต่ำ ${formatNumber(pf as number, 2)} (ต่ำกว่า ${PF_MIN})`);
   if (bad.thdV) reasons.push(`THD-V สูง ${formatNumber(thdV as number, 1)}%`);
   if (bad.thdI) reasons.push(`THD-I สูง ${formatNumber(thdI as number, 1)}%`);
@@ -864,7 +864,11 @@ function analyze(p: Raw) {
   };
 }
 
-export default function PhaseTable({ latestData, isOffline = false }: PhaseTableProps) {
+export default function PhaseTable({
+  latestData,
+  isOffline = false,
+  voltageCfg = DEFAULT_VOLTAGE_CFG,
+}: PhaseTableProps) {
   const params = useParams();
   const buildingId = params?.id;
 
@@ -883,7 +887,7 @@ export default function PhaseTable({ latestData, isOffline = false }: PhaseTable
         v: 0, i: 0, pf: 0, thdV: 0, thdI: 0,
       };
     }
-    return { phase: r.phase, ...analyze(r) };
+    return { phase: r.phase, ...analyze(r, voltageCfg.min, voltageCfg.max) };
   });
 
   const badge = {

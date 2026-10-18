@@ -1,4 +1,4 @@
-
+//routes/adminBuildings.js
 const express = require('express');
 const supabase = require('../supabase');
 const authenticateAdmin = require('../middleware/auth');
@@ -20,7 +20,7 @@ router.get('/', async (req, res) => {
 
 // POST /api/admin/buildings
 router.post('/', async (req, res) => {
-  const { name, location, lat, lng, image_url } = req.body;
+  const { name, lat, lng, image_url } = req.body;
 
   if (!name) return res.status(400).json({ message: 'กรุณากรอกชื่ออาคาร' });
   if (lat === undefined || lng === undefined || lat === null || lng === null) {
@@ -36,7 +36,7 @@ router.post('/', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('buildings')
-      .insert([{ name, location: location || null, lat: latNum, lng: lngNum, image_url: image_url || null }])
+      .insert([{ name, lat: latNum, lng: lngNum, image_url: image_url || null }])
       .select()
       .single();
 
@@ -47,7 +47,6 @@ router.post('/', async (req, res) => {
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ', error: err.message });
   }
 });
-
 // PUT /api/admin/buildings/:id
 router.put('/:id', async (req, res) => {
   const { name, location, lat, lng, image_url } = req.body;

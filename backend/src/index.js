@@ -120,12 +120,18 @@
 // });
 
 
+//backend/src/index.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const supabase = require('./supabase'); // เรียกใช้ Supabase Client กลางจาก ./supabase.js
+const authenticateAdmin = require('./middleware/auth');
 
+if (!process.env.JWT_SECRET) {
+  console.error('❌ ไม่พบ JWT_SECRET ใน .env');
+  process.exit(1);
+}
 // Routes ฝั่ง public (ไม่ต้อง login)
 const buildingsRoutes = require('./routes/buildings');
 const devicesRoutes = require('./routes/devices');
@@ -157,13 +163,18 @@ app.use('/api/devices', devicesRoutes);
 app.use('/api/readings', readingsRoutes);
 app.use('/api/alerts', alertsRoutes);
 
+// // Admin APIs
+// app.use('/api/admin', adminRoutes); 
+// app.use('/api/admin/buildings', adminBuildingsRoutes);
+// app.use('/api/admin/devices', adminDevicesRoutes);
+// app.use('/api/admin/alerts', adminAlertsRoutes);
+// app.use('/api/admin/upload', adminUploadRoute); 
 // Admin APIs
-app.use('/api/admin', adminRoutes); 
-app.use('/api/admin/buildings', adminBuildingsRoutes);
-app.use('/api/admin/devices', adminDevicesRoutes);
-app.use('/api/admin/alerts', adminAlertsRoutes);
-app.use('/api/admin/upload', adminUploadRoute); 
-
+app.use('/api/admin', adminRoutes); // มี /login อยู่ในนี้ ห้ามครอบ auth ทั้งก้อน
+app.use('/api/admin/buildings', authenticateAdmin, adminBuildingsRoutes);
+app.use('/api/admin/devices', authenticateAdmin, adminDevicesRoutes);
+app.use('/api/admin/alerts', authenticateAdmin, adminAlertsRoutes);
+app.use('/api/admin/upload', authenticateAdmin, adminUploadRoute);
 // Ingest APIs
 app.use('/api/ingest', ingestRoutes);
 

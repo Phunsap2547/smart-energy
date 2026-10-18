@@ -285,6 +285,8 @@
 //   );
 // }
 
+
+//app/admin/buildings/[id]/energy/page.tsx
 'use client';
 
 import React, { useState, useEffect, useMemo, use } from 'react';
@@ -306,6 +308,8 @@ import { PowerFactorChart } from '@/components/admin/building/energy/PowerFactor
 // Modal สำหรับพิมพ์รายงาน A4
 import EnergyPrintReportModal from '@/components/admin/building/energy/EnergyPrintReportModal';
 import { EnergyIngest } from '@/types/energy';
+
+import HourlyAverageChart from '@/components/admin/building/energy/HourlyAverageChart';
 
 export interface EnergyTelemetryData {
   voltage_system: number | null;
@@ -604,8 +608,8 @@ export default function EnergyPage({ params }: { params: Promise<{ id: string }>
             selectedDate={selectedDate}
           />
 
-          {/* ฝั่งขวา: กระแสไฟฟ้ารวม System Current */}
-          <CurrentChart data={ingestData} timeRange={timeRange} />
+          
+          <HourlyAverageChart buildingId={buildingId} selectedDate={selectedDate} />
         </div>
 
         {/* Charts Grid 2: Peak Demand และ Power Factor */}
@@ -620,9 +624,12 @@ export default function EnergyPage({ params }: { params: Promise<{ id: string }>
             timeRange={timeRange}
             selectedDate={selectedDate}
           />
+
+          {/* ฝั่งขวา: กระแสไฟฟ้ารวม System Current */}
+          <CurrentChart data={ingestData} timeRange={timeRange} />
         </div>
 
-        {/* Modal พิมพ์รายงาน A4 */}
+        {/* Modal พิมพ์รายงาน A4
         <EnergyPrintReportModal
           isOpen={isExportOpen}
           onClose={() => setIsExportOpen(false)}
@@ -630,7 +637,7 @@ export default function EnergyPage({ params }: { params: Promise<{ id: string }>
           buildingName={buildingName}
           selectedDate={selectedDate}
           telemetry={telemetry}
-        />
+        /> */}
       </main>
     </div>
   );

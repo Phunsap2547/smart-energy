@@ -766,25 +766,29 @@ function getThaiTime() {
   const thaiString = now.toLocaleString('sv-SE', { timeZone: 'Asia/Bangkok' }); // ได้รูปแบบ "YYYY-MM-DD HH:mm:ss"
   return `${thaiString.replace(' ', 'T')}.000+07:00`;
 }
-
 // GET /api/readings/status?device_id=6
+const OFFLINE_THRESHOLD_SEC = 30; // เงียบเกิน 30 วินาทีถือว่าออฟไลน์
+
 router.get('/status', async (req, res) => {
   const { device_id } = req.query;
   if (!device_id) return res.status(400).json({ message: 'กรุณาระบุ device_id' });
+
+  const numDeviceId = Number(device_id);
 
   try {
     const { data: d, error } = await supabase
       .from('devices')
       .select('last_seen_at, meter_ok, boot_count, reset_reason, uptime_sec, wifi_rssi, wifi_drops, modbus_fail')
-      .eq('id', device_id)
+      .eq('id', numDeviceId)
       .maybeSingle();
+
     if (error) throw error;
     if (!d) return res.status(404).json({ message: 'ไม่พบอุปกรณ์' });
 
     const ageSec = d.last_seen_at ? (Date.now() - new Date(d.last_seen_at).getTime()) / 1000 : null;
 
     let state, message;
-    if (ageSec === null || ageSec > 30) {
+    if (ageSec === null || ageSec > OFFLINE_THRESHOLD_SEC) {
       state = 'offline';
       message = 'ไม่ได้รับข้อมูลจากบอร์ด (WiFi/เน็ตหลุด หรือบอร์ดไม่มีไฟ)';
     } else if (d.meter_ok === false) {
@@ -798,13 +802,19 @@ router.get('/status', async (req, res) => {
     const { data: lastBoot } = await supabase
       .from('device_events')
       .select('event_time, detail')
-      .eq('device_id', device_id)
+      .eq('device_id', numDeviceId)
       .eq('type', 'boot')
       .order('event_time', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    res.json({ state, message, age_sec: ageSec !== null ? Math.round(ageSec) : null, ...d, last_boot: lastBoot ?? null });
+    res.json({
+      state,
+      message,
+      age_sec: ageSec !== null ? Math.round(ageSec) : null,
+      ...d,
+      last_boot: lastBoot ?? null,
+    });
   } catch (err) {
     console.error('❌ Error in GET /api/readings/status:', err);
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ', error: err.message });

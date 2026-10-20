@@ -255,7 +255,7 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, Loader2, ZapOff } from 'lucide-react';
+import { AlertTriangle, Loader2, ZapOff, Activity } from 'lucide-react';
 import { formatNumber } from '@/lib/formatter';
 import { useDeviceStatus } from '@/hooks/useDeviceStatus';
 
@@ -267,6 +267,7 @@ export default function StatusAlertBanners({ status }: StatusAlertBannersProps) 
   const {
     isOffline,
     isStale,
+    isMeterError, // <-- รับสถานะอ่านมิเตอร์ไม่ได้เพิ่มเข้ามา
     silentSec,
     isPowerOutage,
     diffMinutes,
@@ -284,9 +285,9 @@ export default function StatusAlertBanners({ status }: StatusAlertBannersProps) 
     freq,
   } = status;
 
-  // ไฟดับ/ค่าเป็น 0 ทุกเฟส (เฉพาะตอนข้อมูลสด ไม่ใช่ตอนข้อมูลค้าง)
+  // ไฟดับจริง: บอร์ดต้องอ่านมิเตอร์ได้ปกติ (isMeterError เป็น false) แต่แรงดันเป็น 0 V
   const isZeroData =
-    !isOffline && !isStale && (isPowerOutage || (voltage === 0 && current === 0));
+    !isOffline && !isStale && !isMeterError && (isPowerOutage || (voltage === 0 && voltage !== null));
 
   const lastTimeString =
     lastDate && !isNaN(lastDate.getTime())
@@ -305,11 +306,11 @@ export default function StatusAlertBanners({ status }: StatusAlertBannersProps) 
       ? `${Math.floor(silentSec / 60)} นาที ${silentSec % 60} วินาที`
       : `${silentSec} วินาที`;
 
-  if (!isOffline && !isStale && !hasAnyAnomaly && !isZeroData) return null;
+  if (!isOffline && !isStale && !isMeterError && !hasAnyAnomaly && !isZeroData) return null;
 
   return (
     <div className="space-y-3">
-      {/* BANNER 1: OFFLINE (ขาดการส่งสัญญาณเป็นเวลานาน) */}
+      {/* BANNER 1: OFFLINE (ขาดการส่งสัญญาณจากบอร์ด) */}
       {isOffline && (
         <div className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-xl text-red-900 shadow-sm">
           <div className="flex items-center gap-3">
@@ -324,13 +325,33 @@ export default function StatusAlertBanners({ status }: StatusAlertBannersProps) 
             </div>
           </div>
           <span className="text-xs font-semibold px-3 py-1 bg-red-100 text-red-700 rounded-lg shrink-0">
-            ปรับค่ากระแสเป็น 0 A
+            บอร์ดออฟไลน์
           </span>
         </div>
       )}
 
-      {/* BANNER 2: ข้อมูลค้าง (กำลังรอข้อมูลใหม่) */}
-      {isStale && (
+      {/* BANNER 2: METER ERROR (บอร์ดออนไลน์ แต่อ่านค่าจากมิเตอร์ไม่ได้) */}
+      {!isOffline && isMeterError && (
+        <div className="flex items-center justify-between p-4 bg-orange-50 border border-orange-200 rounded-xl text-orange-950 shadow-sm">
+          <div className="flex items-center gap-3">
+            <Activity className="text-orange-600 shrink-0 animate-pulse" size={22} />
+            <div>
+              <h4 className="font-bold text-sm text-orange-900">
+                ⚠️ บอร์ดออนไลน์ แต่อ่านค่าจากมิเตอร์ไม่ได้ (Meter Error)
+              </h4>
+              <p className="text-xs text-orange-700 mt-0.5">
+                สัญญาณเน็ตปกติ แต่ระบบสื่อสาร Modbus/RS-485 มีปัญหา กรุณาเช็กสายสัญญาณ A/B หรือไฟเลี้ยงมิเตอร์
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-semibold px-3 py-1 bg-orange-100 text-orange-800 rounded-lg shrink-0">
+            ตรวจสาย RS-485
+          </span>
+        </div>
+      )}
+
+      {/* BANNER 3: ข้อมูลค้าง (กำลังรอข้อมูลใหม่) */}
+      {isStale && !isMeterError && (
         <div className="flex items-center justify-between p-4 bg-sky-50 border border-sky-200 rounded-xl text-sky-950 shadow-sm">
           <div className="flex items-center gap-3">
             <Loader2 className="text-sky-600 shrink-0 animate-spin" size={22} />
@@ -356,8 +377,8 @@ export default function StatusAlertBanners({ status }: StatusAlertBannersProps) 
         </div>
       )}
 
-      {/* BANNER 3: ZERO DATA / ไฟดับทันทีเมื่อตรวจพบค่าไฟฟ้าเป็น 0 (ข้อมูลสด) */}
-      {!isOffline && !isStale && isZeroData && (
+      {/* BANNER 4: ZERO DATA / ไฟดับจริง (วัดค่าแรงดันได้ 0V ทั้งที่มิเตอร์สื่อสารได้) */}
+      {!isOffline && !isStale && !isMeterError && isZeroData && (
         <div className="flex items-center justify-between p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-950 shadow-sm">
           <div className="flex items-center gap-3">
             <ZapOff className="text-rose-600 shrink-0 animate-pulse" size={22} />
@@ -372,7 +393,7 @@ export default function StatusAlertBanners({ status }: StatusAlertBannersProps) 
                 </span>
               </div>
               <p className="text-xs text-rose-700 mt-1">
-                ตรวจพบแรงดันหรือกระแสไฟฟ้าเป็น 0 ในระบบจริง (อัปเดตล่าสุด {lastTimeString})
+                ตรวจพบแรงดันไฟฟ้าเป็น 0 V ในระบบจริง (อัปเดตล่าสุด {lastTimeString})
               </p>
             </div>
           </div>
@@ -383,8 +404,8 @@ export default function StatusAlertBanners({ status }: StatusAlertBannersProps) 
         </div>
       )}
 
-      {/* BANNER 4: ค่าผิดปกติ (ข้อมูลสด ไม่ใช่ Zero Data) */}
-      {!isOffline && !isStale && !isZeroData && hasAnyAnomaly && (
+      {/* BANNER 5: ค่าผิดปกติ (ข้อมูลสด แรงดัน/กระแสไม่อยู่ในช่วงปกติ) */}
+      {!isOffline && !isStale && !isMeterError && !isZeroData && hasAnyAnomaly && (
         <div className="flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 shadow-sm">
           <div className="flex items-center gap-3">
             <AlertTriangle className="text-amber-600 shrink-0" size={20} />

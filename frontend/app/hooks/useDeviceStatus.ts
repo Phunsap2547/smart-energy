@@ -263,7 +263,6 @@
 // }
 
 
-
 // hooks/useDeviceStatus.ts
 import { useEffect, useMemo, useState } from 'react';
 import { EnergyIngest } from '@/types/energy';
@@ -271,6 +270,15 @@ import { supabase } from '@/lib/supabase';
 import { VoltageCfg, resolveVoltageCfg } from '@/lib/voltage';
 
 export type { VoltageCfg };
+
+// ชนิดข้อมูลสถานะอุปกรณ์จาก API /api/readings/status
+export interface DeviceStatusResponse {
+  state?: 'online' | 'offline' | 'meter_error';
+  message?: string;
+  meter_ok?: boolean;
+  last_seen_at?: string;
+  [key: string]: any;
+}
 
 const STALE_SEC = 60;          // เงียบเกินนี้ = "กำลังวิเคราะห์ / ข้อมูลค้าง"
 const OFFLINE_SEC = 3 * 60;    // เงียบเกินนี้ = ไฟดับ/สัญญาณขาด
@@ -284,7 +292,8 @@ const DEFAULT_PF_MIN = 0.85;
 
 export function useDeviceStatus(
   latestData: EnergyIngest | null,
-  voltageCfg?: VoltageCfg   // ถ้าส่งมาจะใช้ก่อนเสมอ ถ้าไม่ส่ง hook จะดึงจากตาราง devices เอง
+  voltageCfg?: VoltageCfg,            // ถ้าส่งมาจะใช้ก่อนเสมอ ถ้าไม่ส่ง hook จะดึงจากตาราง devices เอง
+  statusData?: DeviceStatusResponse | null  // <-- เพิ่มรับ statusData จาก API /api/readings/status
 ) {
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -292,8 +301,6 @@ export function useDeviceStatus(
     return () => clearInterval(t);
   }, []);
 
-  // ดึงช่วงแรงดันของอุปกรณ์เอง เมื่อหน้าที่เรียกใช้ไม่ได้ส่ง voltageCfg มา
-  // (ทำให้ทุกหน้าที่ใช้ hook นี้ได้ช่วงแรงดันที่ถูกต้องโดยไม่ต้องแก้ทีละหน้า)
   const deviceId = (latestData as any)?.device_id ?? null;
   const [fetchedCfg, setFetchedCfg] = useState<{ id: number; cfg: VoltageCfg } | null>(null);
 
@@ -322,7 +329,6 @@ export function useDeviceStatus(
 
   const cfgMin = voltageCfg?.min ?? activeFetched?.min;
   const cfgMax = voltageCfg?.max ?? activeFetched?.max;
-  // รอโหลดเกณฑ์อยู่ (กันแบนเนอร์แรงดันกะพริบตอนยังใช้ค่า default)
   const cfgPending = !voltageCfg && deviceId != null && !activeFetched;
 
   return useMemo(() => {
@@ -335,8 +341,14 @@ export function useDeviceStatus(
       : 999999;
     const diffMinutes = Math.floor(silentSec / 60);
 
-    const isOffline = !latestData || silentSec >= OFFLINE_SEC;
-    const isStale = !isOffline && silentSec >= STALE_SEC;
+    // ดึงสถานะจาก API /api/readings/status
+    const state = statusData?.state;
+    const meterOk = statusData?.meter_ok;
+
+    // ตรวจจับสถานะหลัก
+    const isMeterError = state === 'meter_error' || meterOk === false;
+    const isOffline = state === 'offline' || !latestData || silentSec >= OFFLINE_SEC;
+    const isStale = !isOffline && !isMeterError && silentSec >= STALE_SEC;
 
     const d = latestData as any;
     const volts = [d?.voltage_system, d?.voltage_a, d?.voltage_b, d?.voltage_c]
@@ -345,17 +357,18 @@ export function useDeviceStatus(
       .filter((v) => !isNaN(v));
 
     const rawVoltage = Number(d?.voltage_system ?? d?.voltage_a ?? 0);
+    
+    // ตรวจจับไฟดับ: ต้องแมชต์ว่าออนไลน์อยู่, มิเตอร์ไม่สื่อสารขัดข้อง (isMeterError: false), และแรงดันตกต่ำกว่า 50V
     const isPowerOutage =
-      !isOffline && !isStale && volts.length > 0 && volts.every((v) => v < OUTAGE_VOLT);
+      !isOffline && !isStale && !isMeterError && volts.length > 0 && volts.every((v) => v < OUTAGE_VOLT);
 
-    const live = !isOffline && !isStale && !isPowerOutage;
+    const live = !isOffline && !isStale && !isMeterError && !isPowerOutage;
 
     const voltage = live ? rawVoltage : 0;
     const current = live ? (latestData?.current_system ?? 0) : 0;
     const pf = live ? (latestData?.power_factor ?? 0) : 0;
     const freq = live ? (latestData?.frequency_hz ?? 0) : 0;
 
-    // ลำดับความสำคัญ: voltageCfg (prop) > ที่ดึงจาก devices > field ใน reading (/latest) > default
     const voltMin = Number(cfgMin ?? d?.voltage_min ?? DEFAULT_VOLT_MIN);
     const voltMax = Number(cfgMax ?? d?.voltage_max ?? DEFAULT_VOLT_MAX);
     const currentMax = Number(d?.current_max ?? DEFAULT_CURRENT_MAX);
@@ -372,6 +385,7 @@ export function useDeviceStatus(
 
     return {
       isOffline,
+      isMeterError,
       isStale,
       silentSec,
       isPowerOutage,
@@ -391,5 +405,5 @@ export function useDeviceStatus(
       isFreqAnomaly,
       hasAnyAnomaly,
     };
-  }, [latestData, nowMs, cfgMin, cfgMax, cfgPending]);
+  }, [latestData, statusData, nowMs, cfgMin, cfgMax, cfgPending]);
 }

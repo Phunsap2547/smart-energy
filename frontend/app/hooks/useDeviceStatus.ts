@@ -263,7 +263,7 @@
 // }
 
 
-/// hooks/useDeviceStatus.ts
+//// hooks/useDeviceStatus.ts
 import { useEffect, useMemo, useState } from 'react';
 import { EnergyIngest } from '@/types/energy';
 import { supabase } from '@/lib/supabase';
@@ -343,14 +343,14 @@ export function useDeviceStatus(
       ? Math.max(0, Math.floor((nowMs - boardLastSeenDate!.getTime()) / 1000))
       : 999999;
 
-    const state = statusData?.state;
     const meterOk = statusData?.meter_ok;
 
-    // บอร์ดจะ Offline ก็ต่อเมื่อ API บอกว่า offline หรือขาดการติดต่อ (last_seen_at) เกิน 3 นาที
-    const isOffline = state === 'offline' || boardSilentSec >= OFFLINE_SEC;
+    // [แก้] บอร์ด Offline ตัดสินจาก last_seen_at เงียบเกิน 3 นาที เท่านั้น
+    // (ไม่เชื่อ state จาก API ซ้ำ เพราะ threshold ของ API อาจไม่ตรงกับฝั่งนี้)
+    const isOffline = boardSilentSec >= OFFLINE_SEC;
 
-    // บอร์ดขึ้น Meter Error ต่อเมื่อ บอร์ดยังอยู่ (ไม่ offline) แต่อ่านค่าจากมิเตอร์ไม่ได้ (meter_ok === false)
-    const isMeterError = !isOffline && (state === 'meter_error' || meterOk === false);
+    // [แก้] Meter Error ต่อเมื่อบอร์ดยังออนไลน์ แต่อ่านมิเตอร์ไม่ได้ (meter_ok === false)
+    const isMeterError = !isOffline && meterOk === false;
 
     // -------------------------------------------------------------
     // 2. ตรวจสอบเวลาข้อมูลล่าสุดจากตาราง energy_readings
@@ -378,7 +378,7 @@ export function useDeviceStatus(
 
     const rawVoltage = Number(d?.voltage_system ?? d?.voltage_a ?? 0);
 
-    // ไฟดับจริง: ต้องออนไลน์อยู่, มิเตอร์วัดได้ปกติ (isMeterError: false), และแรงดันต่ำกว่า 50V ทุกเฟส
+    // ไฟดับจริง: ต้องออนไลน์อยู่, มิเตอร์วัดได้ปกติ, และแรงดันต่ำกว่า 50V ทุกเฟส
     const isPowerOutage =
       !isOffline && !isStale && !isMeterError && volts.length > 0 && volts.every((v) => v < OUTAGE_VOLT);
 
@@ -404,7 +404,7 @@ export function useDeviceStatus(
 
     return {
       isOffline,
-      isMeterError, // <-- ปล่อยสถานะอ่านมิเตอร์ไม่ได้ ให้ Banner สีส้มแสดงผล
+      isMeterError, // ปล่อยสถานะอ่านมิเตอร์ไม่ได้ ให้ Banner สีส้มแสดงผล
       isStale,
       silentSec,
       isPowerOutage,

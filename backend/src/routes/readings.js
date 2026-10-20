@@ -767,7 +767,7 @@ function getThaiTime() {
   return `${thaiString.replace(' ', 'T')}.000+07:00`;
 }
 // GET /api/readings/status?device_id=6
-const OFFLINE_THRESHOLD_SEC = 180;// เงียบเกิน 3 นาทีถือว่าออฟไลน์
+const OFFLINE_THRESHOLD_SEC = 180; // [แก้] เดิม 30 -> เงียบเกิน 3 นาทีถือว่าออฟไลน์ (ให้ตรงกับ hook)
 
 router.get('/status', async (req, res) => {
   const { device_id } = req.query;
@@ -787,16 +787,16 @@ router.get('/status', async (req, res) => {
 
     const ageSec = d.last_seen_at ? (Date.now() - new Date(d.last_seen_at).getTime()) / 1000 : null;
 
-    let state, message;
+    // [แก้] ใส่ค่า default กัน state เป็น undefined
+    let state = 'online';
+    let message = 'ปกติ';
+
     if (ageSec === null || ageSec > OFFLINE_THRESHOLD_SEC) {
       state = 'offline';
       message = 'ไม่ได้รับข้อมูลจากบอร์ด (WiFi/เน็ตหลุด หรือบอร์ดไม่มีไฟ)';
     } else if (d.meter_ok === false) {
       state = 'meter_error';
       message = 'บอร์ดออนไลน์ แต่อ่านมิเตอร์ไม่ได้ (ตรวจสาย RS-485)';
-    } else {
-      state = 'online';
-      message = 'ปกติ';
     }
 
     const { data: lastBoot } = await supabase

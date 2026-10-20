@@ -767,7 +767,7 @@ function getThaiTime() {
   return `${thaiString.replace(' ', 'T')}.000+07:00`;
 }
 // GET /api/readings/status?device_id=6
-const OFFLINE_THRESHOLD_SEC = 30; // เงียบเกิน 30 วินาทีถือว่าออฟไลน์
+const OFFLINE_THRESHOLD_SEC = 180;// เงียบเกิน 3 นาทีถือว่าออฟไลน์
 
 router.get('/status', async (req, res) => {
   const { device_id } = req.query;
@@ -913,7 +913,7 @@ router.get('/energy', async (req, res) => {
       const dateObj = new Date(r.reading_time);
       // แปลงเป็น ISO string ใน Timezone ไทย
       const thaiIso = dateObj.toLocaleString('sv-SE', { timeZone: 'Asia/Bangkok' }); // "YYYY-MM-DD HH:mm:ss"
-      
+
       let key;
       if (groupBy === 'hour') key = `${thaiIso.slice(11, 13)}:00`;
       else if (groupBy === 'day') key = `${thaiIso.slice(8, 10)}/${thaiIso.slice(5, 7)}`;

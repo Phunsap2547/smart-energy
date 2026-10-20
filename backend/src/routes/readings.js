@@ -767,6 +767,50 @@ function getThaiTime() {
   return `${thaiString.replace(' ', 'T')}.000+07:00`;
 }
 
+// GET /api/readings/status?device_id=6
+router.get('/status', async (req, res) => {
+  const { device_id } = req.query;
+  if (!device_id) return res.status(400).json({ message: 'กรุณาระบุ device_id' });
+
+  try {
+    const { data: d, error } = await supabase
+      .from('devices')
+      .select('last_seen_at, meter_ok, boot_count, reset_reason, uptime_sec, wifi_rssi, wifi_drops, modbus_fail')
+      .eq('id', device_id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!d) return res.status(404).json({ message: 'ไม่พบอุปกรณ์' });
+
+    const ageSec = d.last_seen_at ? (Date.now() - new Date(d.last_seen_at).getTime()) / 1000 : null;
+
+    let state, message;
+    if (ageSec === null || ageSec > 30) {
+      state = 'offline';
+      message = 'ไม่ได้รับข้อมูลจากบอร์ด (WiFi/เน็ตหลุด หรือบอร์ดไม่มีไฟ)';
+    } else if (d.meter_ok === false) {
+      state = 'meter_error';
+      message = 'บอร์ดออนไลน์ แต่อ่านมิเตอร์ไม่ได้ (ตรวจสาย RS-485)';
+    } else {
+      state = 'online';
+      message = 'ปกติ';
+    }
+
+    const { data: lastBoot } = await supabase
+      .from('device_events')
+      .select('event_time, detail')
+      .eq('device_id', device_id)
+      .eq('type', 'boot')
+      .order('event_time', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    res.json({ state, message, age_sec: ageSec !== null ? Math.round(ageSec) : null, ...d, last_boot: lastBoot ?? null });
+  } catch (err) {
+    console.error('❌ Error in GET /api/readings/status:', err);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ', error: err.message });
+  }
+});
+
 // -----------------------------------------------------------------------------
 // GET /api/readings — ดึงประวัติค่าไฟดิบจาก Supabase
 // -----------------------------------------------------------------------------

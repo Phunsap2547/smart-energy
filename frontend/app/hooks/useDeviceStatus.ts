@@ -262,8 +262,184 @@
 //   }, [latestData, nowMs, cfgMin, cfgMax]);
 // }
 
+// /// hooks/useDeviceStatus.ts
+// import { useEffect, useMemo, useState } from 'react';
+// import { EnergyIngest } from '@/types/energy';
+// import { supabase } from '@/lib/supabase';
+// import { VoltageCfg, resolveVoltageCfg } from '@/lib/voltage';
 
-//// hooks/useDeviceStatus.ts
+// export type { VoltageCfg };
+
+// // ชนิดข้อมูลสถานะอุปกรณ์จาก API /api/readings/status
+// export interface DeviceStatusResponse {
+//   state?: 'online' | 'offline' | 'meter_error';
+//   message?: string;
+//   meter_ok?: boolean;
+//   last_seen_at?: string;
+//   [key: string]: any;
+// }
+
+// const STALE_SEC = 60;          // ค่าวัดมิเตอร์เงียบเกินนี้ = "ข้อมูลค้าง"
+// const OFFLINE_SEC = 3 * 60;    // บอร์ดขาดการติดต่อเกิน 3 นาที = "ออฟไลน์"
+// const OUTAGE_VOLT = 50;        // แรงดันต่ำกว่านี้ทุกเฟส = "ไฟดับ"
+
+// // ค่า fallback กรณีหาเกณฑ์ของอุปกรณ์ไม่ได้
+// const DEFAULT_VOLT_MIN = 220;
+// const DEFAULT_VOLT_MAX = 240;
+// const DEFAULT_CURRENT_MAX = 100;
+// const DEFAULT_PF_MIN = 0.85;
+
+// // reading_time เก็บเป็นเวลาไทยแบบไม่มี timezone (เช่น "2026-10-20T22:41:12")
+// // ถ้าไม่มี offset ให้ตีความเป็น +07:00 เพื่อไม่ให้เพี้ยนตาม timezone ของเบราว์เซอร์
+// const parseThai = (s: string) =>
+//   new Date(/(Z|[+-]\d{2}:?\d{2})$/i.test(s) ? s : s + '+07:00');
+
+// export function useDeviceStatus(
+//   latestData: EnergyIngest | null,
+//   voltageCfg?: VoltageCfg,                  // ถ้าส่งมาจะใช้ก่อนเสมอ
+//   statusData?: DeviceStatusResponse | null  // รับ statusData จาก API /api/readings/status
+// ) {
+//   const [nowMs, setNowMs] = useState(() => Date.now());
+//   useEffect(() => {
+//     const t = setInterval(() => setNowMs(Date.now()), 1000);
+//     return () => clearInterval(t);
+//   }, []);
+
+//   const deviceId = (latestData as any)?.device_id ?? null;
+//   const [fetchedCfg, setFetchedCfg] = useState<{ id: number; cfg: VoltageCfg } | null>(null);
+
+//   useEffect(() => {
+//     if (voltageCfg || deviceId == null) return;
+//     if (fetchedCfg && fetchedCfg.id === Number(deviceId)) return;
+
+//     let cancelled = false;
+//     supabase
+//       .from('devices')
+//       .select('voltage_min, voltage_max, nominal_voltage')
+//       .eq('id', deviceId)
+//       .maybeSingle()
+//       .then(({ data }) => {
+//         if (cancelled || !data) return;
+//         setFetchedCfg({ id: Number(deviceId), cfg: resolveVoltageCfg(data) });
+//       });
+
+//     return () => {
+//       cancelled = true;
+//     };
+//   }, [deviceId, voltageCfg, fetchedCfg]);
+
+//   const activeFetched =
+//     fetchedCfg && deviceId != null && fetchedCfg.id === Number(deviceId) ? fetchedCfg.cfg : null;
+
+//   const cfgMin = voltageCfg?.min ?? activeFetched?.min;
+//   const cfgMax = voltageCfg?.max ?? activeFetched?.max;
+//   const cfgPending = !voltageCfg && deviceId != null && !activeFetched;
+
+//   return useMemo(() => {
+//     // -------------------------------------------------------------
+//     // 1. เวลาข้อมูลล่าสุดจากตาราง energy_readings
+//     // -------------------------------------------------------------
+//     const rawTime = latestData?.reading_time || latestData?.created_at;
+//     const lastDate = rawTime ? parseThai(String(rawTime)) : null;
+//     const validDate = !!lastDate && !isNaN(lastDate.getTime());
+
+//     const silentSec = validDate
+//       ? Math.max(0, Math.floor((nowMs - lastDate!.getTime()) / 1000))
+//       : 999999;
+//     const diffMinutes = Math.floor(silentSec / 60);
+
+//     // -------------------------------------------------------------
+//     // 2. สถานะออนไลน์ของ "ตัวบอร์ด"
+//     //    ใช้เวลาที่ใหม่กว่าของ devices.last_seen_at และ energy_readings.reading_time
+//     //    (ถ้า statusData หลุด/ค้าง แต่มี reading ใหม่เข้ามา จะไม่ถูกตีว่า offline)
+//     // -------------------------------------------------------------
+//     const boardLastSeenRaw = statusData?.last_seen_at;
+//     const boardLastSeenDate = boardLastSeenRaw ? new Date(boardLastSeenRaw) : null;
+//     const isBoardTimeValid = !!boardLastSeenDate && !isNaN(boardLastSeenDate.getTime());
+
+//     const boardMs = isBoardTimeValid ? boardLastSeenDate!.getTime() : 0;
+//     const readingMs = validDate ? lastDate!.getTime() : 0;
+//     const latestMs = Math.max(boardMs, readingMs);
+
+//     const boardSilentSec = latestMs
+//       ? Math.max(0, Math.floor((nowMs - latestMs) / 1000))
+//       : 999999;
+
+//     const meterOk = statusData?.meter_ok;
+
+//     // บอร์ด Offline ตัดสินจากเวลาเงียบเกิน 3 นาทีเท่านั้น (ไม่เชื่อ state จาก API ซ้ำ)
+//     const isOffline = boardSilentSec >= OFFLINE_SEC;
+
+//     // Meter Error ต่อเมื่อบอร์ดยังออนไลน์ แต่อ่านมิเตอร์ไม่ได้ (meter_ok === false)
+//     const isMeterError = !isOffline && meterOk === false;
+
+//     // ข้อมูลค้าง (Stale) คือ บอร์ดออนไลน์ + อ่านมิเตอร์ได้ปกติ แต่ไม่มีค่าวัดใหม่เกิน 60 วินาที
+//     const isStale = !isOffline && !isMeterError && silentSec >= STALE_SEC;
+
+//     // -------------------------------------------------------------
+//     // 3. ตรวจสอบค่าวัดไฟฟ้า (Voltage / Current / Power)
+//     // -------------------------------------------------------------
+//     const d = latestData as any;
+//     const volts = [d?.voltage_system, d?.voltage_a, d?.voltage_b, d?.voltage_c]
+//       .filter((v) => v !== null && v !== undefined)
+//       .map(Number)
+//       .filter((v) => !isNaN(v));
+
+//     const rawVoltage = Number(d?.voltage_system ?? d?.voltage_a ?? 0);
+
+//     // ไฟดับจริง: ต้องออนไลน์อยู่, มิเตอร์วัดได้ปกติ, และแรงดันต่ำกว่า 50V ทุกเฟส
+//     const isPowerOutage =
+//       !isOffline && !isStale && !isMeterError && volts.length > 0 && volts.every((v) => v < OUTAGE_VOLT);
+
+//     const live = !isOffline && !isStale && !isMeterError && !isPowerOutage;
+
+//     const voltage = live ? rawVoltage : 0;
+//     const current = live ? (latestData?.current_system ?? 0) : 0;
+//     const pf = live ? (latestData?.power_factor ?? 0) : 0;
+//     const freq = live ? (latestData?.frequency_hz ?? 0) : 0;
+
+//     const voltMin = Number(cfgMin ?? d?.voltage_min ?? DEFAULT_VOLT_MIN);
+//     const voltMax = Number(cfgMax ?? d?.voltage_max ?? DEFAULT_VOLT_MAX);
+//     const currentMax = Number(d?.current_max ?? DEFAULT_CURRENT_MAX);
+//     const pfMin = Number(d?.pf_min ?? DEFAULT_PF_MIN);
+
+//     const isVoltageAnomaly = live && !cfgPending && (voltage < voltMin || voltage > voltMax);
+//     const isCurrentAnomaly = live && current >= currentMax;
+//     const isPfAnomaly = live && pf < pfMin;
+//     const isFreqAnomaly = live && (freq < 49 || freq > 51);
+
+//     const hasAnyAnomaly =
+//       isPowerOutage || isVoltageAnomaly || isCurrentAnomaly || isPfAnomaly || isFreqAnomaly;
+
+//     return {
+//       isOffline,
+//       isMeterError, // ปล่อยสถานะอ่านมิเตอร์ไม่ได้ ให้ Banner สีส้มแสดงผล
+//       isStale,
+//       silentSec,
+//       boardSilentSec, // เวลาที่บอร์ดเงียบจริง (999999 = ไม่พบข้อมูลสถานะเลย)
+//       isPowerOutage,
+//       diffMinutes,
+//       lastDate,
+//       voltage,
+//       current,
+//       pf,
+//       freq,
+//       voltMin,
+//       voltMax,
+//       currentMax,
+//       pfMin,
+//       isVoltageAnomaly,
+//       isCurrentAnomaly,
+//       isPfAnomaly,
+//       isFreqAnomaly,
+//       hasAnyAnomaly,
+//     };
+//   }, [latestData, statusData, nowMs, cfgMin, cfgMax, cfgPending]);
+// }
+
+
+
+// hooks/useDeviceStatus.ts
 import { useEffect, useMemo, useState } from 'react';
 import { EnergyIngest } from '@/types/energy';
 import { supabase } from '@/lib/supabase';
@@ -271,18 +447,9 @@ import { VoltageCfg, resolveVoltageCfg } from '@/lib/voltage';
 
 export type { VoltageCfg };
 
-// ชนิดข้อมูลสถานะอุปกรณ์จาก API /api/readings/status
-export interface DeviceStatusResponse {
-  state?: 'online' | 'offline' | 'meter_error';
-  message?: string;
-  meter_ok?: boolean;
-  last_seen_at?: string;
-  [key: string]: any;
-}
-
-const STALE_SEC = 60;          // ค่าวัดมิเตอร์เงียบเกินนี้ = "ข้อมูลค้าง"
-const OFFLINE_SEC = 3 * 60;    // บอร์ดขาดการติดต่อเกิน 3 นาที = "ออฟไลน์"
-const OUTAGE_VOLT = 50;        // แรงดันต่ำกว่านี้ทุกเฟส = "ไฟดับ"
+const STALE_SEC = 60;          // เงียบเกินนี้ = "กำลังวิเคราะห์ / ข้อมูลค้าง"
+const OFFLINE_SEC = 3 * 60;    // เงียบเกินนี้ = ไฟดับ/สัญญาณขาด
+const OUTAGE_VOLT = 50;        // แรงดันต่ำกว่านี้ทุกเฟส = ไฟดับ
 
 // ค่า fallback กรณีหาเกณฑ์ของอุปกรณ์ไม่ได้
 const DEFAULT_VOLT_MIN = 220;
@@ -292,8 +459,7 @@ const DEFAULT_PF_MIN = 0.85;
 
 export function useDeviceStatus(
   latestData: EnergyIngest | null,
-  voltageCfg?: VoltageCfg,                  // ถ้าส่งมาจะใช้ก่อนเสมอ
-  statusData?: DeviceStatusResponse | null  // รับ statusData จาก API /api/readings/status
+  voltageCfg?: VoltageCfg   // ถ้าส่งมาจะใช้ก่อนเสมอ ถ้าไม่ส่ง hook จะดึงจากตาราง devices เอง
 ) {
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -301,6 +467,8 @@ export function useDeviceStatus(
     return () => clearInterval(t);
   }, []);
 
+  // ดึงช่วงแรงดันของอุปกรณ์เอง เมื่อหน้าที่เรียกใช้ไม่ได้ส่ง voltageCfg มา
+  // (ทำให้ทุกหน้าที่ใช้ hook นี้ได้ช่วงแรงดันที่ถูกต้องโดยไม่ต้องแก้ทีละหน้า)
   const deviceId = (latestData as any)?.device_id ?? null;
   const [fetchedCfg, setFetchedCfg] = useState<{ id: number; cfg: VoltageCfg } | null>(null);
 
@@ -329,32 +497,10 @@ export function useDeviceStatus(
 
   const cfgMin = voltageCfg?.min ?? activeFetched?.min;
   const cfgMax = voltageCfg?.max ?? activeFetched?.max;
+  // รอโหลดเกณฑ์อยู่ (กันแบนเนอร์แรงดันกะพริบตอนยังใช้ค่า default)
   const cfgPending = !voltageCfg && deviceId != null && !activeFetched;
 
   return useMemo(() => {
-    // -------------------------------------------------------------
-    // 1. ตรวจสอบสถานะการออนไลน์ของ "ตัวบอร์ด" (อ้างอิงจาก devices.last_seen_at)
-    // -------------------------------------------------------------
-    const boardLastSeenRaw = statusData?.last_seen_at;
-    const boardLastSeenDate = boardLastSeenRaw ? new Date(boardLastSeenRaw) : null;
-    const isBoardTimeValid = boardLastSeenDate && !isNaN(boardLastSeenDate.getTime());
-
-    const boardSilentSec = isBoardTimeValid
-      ? Math.max(0, Math.floor((nowMs - boardLastSeenDate!.getTime()) / 1000))
-      : 999999;
-
-    const meterOk = statusData?.meter_ok;
-
-    // [แก้] บอร์ด Offline ตัดสินจาก last_seen_at เงียบเกิน 3 นาที เท่านั้น
-    // (ไม่เชื่อ state จาก API ซ้ำ เพราะ threshold ของ API อาจไม่ตรงกับฝั่งนี้)
-    const isOffline = boardSilentSec >= OFFLINE_SEC;
-
-    // [แก้] Meter Error ต่อเมื่อบอร์ดยังออนไลน์ แต่อ่านมิเตอร์ไม่ได้ (meter_ok === false)
-    const isMeterError = !isOffline && meterOk === false;
-
-    // -------------------------------------------------------------
-    // 2. ตรวจสอบเวลาข้อมูลล่าสุดจากตาราง energy_readings
-    // -------------------------------------------------------------
     const rawTime = latestData?.reading_time || latestData?.created_at;
     const lastDate = rawTime ? new Date(rawTime) : null;
     const validDate = lastDate && !isNaN(lastDate.getTime());
@@ -364,12 +510,9 @@ export function useDeviceStatus(
       : 999999;
     const diffMinutes = Math.floor(silentSec / 60);
 
-    // ข้อมูลค้าง (Stale) คือ บอร์ดออนไลน์ + อ่านมิเตอร์ได้ปกติ แต่ไม่มีค่าวัดใหม่เกิน 60 วินาที
-    const isStale = !isOffline && !isMeterError && silentSec >= STALE_SEC;
+    const isOffline = !latestData || silentSec >= OFFLINE_SEC;
+    const isStale = !isOffline && silentSec >= STALE_SEC;
 
-    // -------------------------------------------------------------
-    // 3. ตรวจสอบค่าวัดไฟฟ้า (Voltage / Current / Power)
-    // -------------------------------------------------------------
     const d = latestData as any;
     const volts = [d?.voltage_system, d?.voltage_a, d?.voltage_b, d?.voltage_c]
       .filter((v) => v !== null && v !== undefined)
@@ -377,24 +520,24 @@ export function useDeviceStatus(
       .filter((v) => !isNaN(v));
 
     const rawVoltage = Number(d?.voltage_system ?? d?.voltage_a ?? 0);
-
-    // ไฟดับจริง: ต้องออนไลน์อยู่, มิเตอร์วัดได้ปกติ, และแรงดันต่ำกว่า 50V ทุกเฟส
     const isPowerOutage =
-      !isOffline && !isStale && !isMeterError && volts.length > 0 && volts.every((v) => v < OUTAGE_VOLT);
+      !isOffline && !isStale && volts.length > 0 && volts.every((v) => v < OUTAGE_VOLT);
 
-    const live = !isOffline && !isStale && !isMeterError && !isPowerOutage;
+    const live = !isOffline && !isStale && !isPowerOutage;
 
     const voltage = live ? rawVoltage : 0;
     const current = live ? (latestData?.current_system ?? 0) : 0;
     const pf = live ? (latestData?.power_factor ?? 0) : 0;
     const freq = live ? (latestData?.frequency_hz ?? 0) : 0;
 
+    // ลำดับความสำคัญ: voltageCfg (prop) > ที่ดึงจาก devices > field ใน reading (/latest) > default
     const voltMin = Number(cfgMin ?? d?.voltage_min ?? DEFAULT_VOLT_MIN);
     const voltMax = Number(cfgMax ?? d?.voltage_max ?? DEFAULT_VOLT_MAX);
     const currentMax = Number(d?.current_max ?? DEFAULT_CURRENT_MAX);
     const pfMin = Number(d?.pf_min ?? DEFAULT_PF_MIN);
 
-    const isVoltageAnomaly = live && !cfgPending && (voltage < voltMin || voltage > voltMax);
+    const isVoltageAnomaly =
+      live && !cfgPending && (voltage < voltMin || voltage > voltMax);
     const isCurrentAnomaly = live && current >= currentMax;
     const isPfAnomaly = live && pf < pfMin;
     const isFreqAnomaly = live && (freq < 49 || freq > 51);
@@ -404,7 +547,6 @@ export function useDeviceStatus(
 
     return {
       isOffline,
-      isMeterError, // ปล่อยสถานะอ่านมิเตอร์ไม่ได้ ให้ Banner สีส้มแสดงผล
       isStale,
       silentSec,
       isPowerOutage,
@@ -424,5 +566,5 @@ export function useDeviceStatus(
       isFreqAnomaly,
       hasAnyAnomaly,
     };
-  }, [latestData, statusData, nowMs, cfgMin, cfgMax, cfgPending]);
+  }, [latestData, nowMs, cfgMin, cfgMax, cfgPending]);
 }

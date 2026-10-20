@@ -1,3 +1,28 @@
+//ingest.js
+const express = require('express');
+const { createClient } = require('@supabase/supabase-js');
+const verifyApiKey = require('../middleware/apiKey');
+
+const router = express.Router();
+
+// 1. ประกาศ Supabase Client
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: { persistSession: false },
+  realtime: { transport: null },
+});
+
+router.use(verifyApiKey);
+
+// ฟังก์ชันสร้าง Timestamp เวลาไทย (UTC+7)
+const getThaiTime = () => {
+  const now = new Date();
+  const thaiDate = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+  return thaiDate.toISOString().replace('Z', '');
+};
+
+// ฟังก์ชันรับและแมปค่ารองรับทั้ง ESP32 (camelCase) และ Database (snake_case)
 const handleIngestReadings = async (req, res) => {
   const body = req.body;
   const device_id = body.device_id || body.meterId;
@@ -138,6 +163,7 @@ const handleIngestReadings = async (req, res) => {
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล', error: err.message });
   }
 };
+
 // รองรับทั้ง POST /api/ingest และ POST /api/ingest/readings
 router.post('/', handleIngestReadings);
 router.post('/readings', handleIngestReadings);

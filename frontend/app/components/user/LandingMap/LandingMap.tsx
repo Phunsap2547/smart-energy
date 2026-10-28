@@ -143,9 +143,10 @@ interface Building {
 
 // ✅ สีตามสถานะ (key เป็นตัวพิมพ์เล็กให้ตรงกับค่าใน buildings.status)
 const STATUS_COLOR: Record<string, string> = {
-  normal: "#16a34a", // เขียว
-  warning: "#f59e0b", // ส้ม/เหลือง
+  normal: "#16a34a",   // เขียว
+  warning: "#f59e0b",  // ส้ม/เหลือง
   critical: "#dc2626", // แดง
+  offline: "#6b7280",  // เทา (Offline / ไม่มีข้อมูล)
 };
 const DEFAULT_COLOR = "#6b7280"; // เทา (สถานะที่ไม่รู้จัก)
 
@@ -153,6 +154,7 @@ const STATUS_LABEL: Record<string, string> = {
   normal: "Normal",
   warning: "Warning",
   critical: "Critical",
+  offline: "Offline",
 };
 
 const normalizeStatus = (s?: string) => (s ?? "").trim().toLowerCase();

@@ -553,7 +553,41 @@ router.get('/', async (req, res) => {
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงข้อมูลการแจ้งเตือน', error: err.message });
   }
 });
+// // ฟังก์ชันสำหรับคำนวณสถานะจริงของอาคาร
+// async function calculateBuildingStatus(buildingId) {
+//   // 1. ดึงอุปกรณ์ทั้งหมดในอาคาร
+//   const { data: devices } = await supabase
+//     .from('devices')
+//     .select('id, last_seen') // หรือดึงอ่านค่าล่าสุดจาก telemetry
+//     .eq('building_id', buildingId);
 
+//   if (!devices || devices.length === 0) return 'offline';
+
+//   // เช็คว่าอุปกรณ์ทุกตัวขาดการติดต่อเกิน 3 นาทีหรือไม่
+//   const OFFLINE_MS = 3 * 60 * 1000;
+//   const now = Date.now();
+//   const isAllOffline = devices.every(d => !d.last_seen || (now - new Date(d.last_seen).getTime()) > OFFLINE_MS);
+
+//   if (isAllOffline) return 'offline';
+
+//   // 2. เช็ค Anomalies ที่ยังเปิดอยู่ (Open)
+//   const { data: activeAnomalies } = await supabase
+//     .from('anomalies')
+//     .select('severity, devices!inner(building_id)')
+//     .eq('devices.building_id', buildingId)
+//     .eq('status', 'open');
+
+//   let maxRank = 0;
+//   const severityRank = { warning: 1, high: 2, critical: 3 };
+
+//   (activeAnomalies || []).forEach((a) => {
+//     const rank = severityRank[a.severity] || 0;
+//     if (rank > maxRank) maxRank = rank;
+//   });
+
+//   const rankToBuildingStatus = { 0: 'normal', 1: 'warning', 2: 'warning', 3: 'critical' };
+//   return rankToBuildingStatus[maxRank] || 'normal';
+// }
 // -----------------------------------------------------------------------------
 // GET /api/admin/alerts/stats — สรุปสถิติสำหรับ Dashboard Cards
 // -----------------------------------------------------------------------------

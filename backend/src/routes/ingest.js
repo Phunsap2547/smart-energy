@@ -16,11 +16,12 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 router.use(verifyApiKey);
 
 // ฟังก์ชันสร้าง Timestamp เวลาไทย (UTC+7)
-const getThaiTime = () => {
-  const now = new Date();
-  const thaiDate = new Date(now.getTime() + (7 * 60 * 60 * 1000));
-  return thaiDate.toISOString().replace('Z', '');
-};
+const getThaiTime = () => new Date().toISOString(); // เช่น 2026-10-18T16:10:39.480Z
+// const getThaiTime = () => {
+//   const now = new Date();
+//   const thaiDate = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+//   return thaiDate.toISOString().replace('Z', '');
+// };
 
 // ฟังก์ชันรับและแมปค่ารองรับทั้ง ESP32 (camelCase) และ Database (snake_case)
 const handleIngestReadings = async (req, res) => {

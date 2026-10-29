@@ -27,9 +27,12 @@ function thaiParts(d: Date) {
 
 
 // อ่าน y/m/d/h จาก string ตรงๆ (reading_time เก็บเป็นเวลาไทยอยู่แล้ว) ไม่ให้ JS แปลง timezone ซ้ำ
+// function parseStamp(raw: string) {
+//   const m = raw.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2})/);
+//   if (m) return { y: +m[1], m: +m[2], d: +m[3], h: +m[4] };
+//   return thaiParts(new Date(raw));
+// }
 function parseStamp(raw: string) {
-  const m = raw.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2})/);
-  if (m) return { y: +m[1], m: +m[2], d: +m[3], h: +m[4] };
   return thaiParts(new Date(raw));
 }
 

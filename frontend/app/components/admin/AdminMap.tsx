@@ -8,8 +8,12 @@ import { useEffect, useState, FormEvent } from "react";
 import theme from "@/config/theme.js";
 import { UserCircle2, X, Settings2, Pencil, Trash2, Plus, ImagePlus, Layers } from "lucide-react";
 import Link from 'next/link';
+import { supabase } from "@/lib/supabase";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+// ⏱️ ถ้าไม่มีข้อมูลเข้ามาเกินเวลานี้ จะแสดงเป็น Offline (ปรับให้ตรงกับเกณฑ์ใน useDeviceStatus)
+const OFFLINE_AFTER_MS = 3 * 60 * 1000; // 3 นาที
 
 // หมุด "ร่าง" ใช้ตอนกำลังเพิ่ม/แก้ไขอาคาร เพื่อพรีวิวตำแหน่งก่อนบันทึกจริง
 const draftIcon = new L.Icon({
@@ -27,6 +31,7 @@ const STATUS_COLOR: Record<string, string> = {
   normal: "#16a34a",   // เขียว
   warning: "#f59e0b",  // ส้ม/เหลือง
   critical: "#dc2626", // แดง
+  offline: "#6b7280",  // เทา (ไม่มีข้อมูลเข้า)
 };
 const DEFAULT_COLOR = "#6b7280"; // เทา (สถานะที่ไม่รู้จัก)
 
@@ -34,6 +39,7 @@ const STATUS_LABEL: Record<string, string> = {
   normal: "Normal",
   warning: "Warning",
   critical: "Critical",
+  offline: "Offline",
 };
 
 const normalizeStatus = (s?: string) => (s ?? "").trim().toLowerCase();
@@ -257,6 +263,10 @@ export default function AdminMapView() {
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
 
+  // ✅ เวลาข้อมูลล่าสุดของแต่ละอาคาร (ms) ใช้เช็คสถานะ Offline
+  const [lastSeen, setLastSeen] = useState<Record<number, number | null>>({});
+  const [seenLoaded, setSeenLoaded] = useState(false);
+
   const [form, setForm] = useState({
     name: "",
     location: "",
@@ -300,6 +310,51 @@ export default function AdminMapView() {
     }
   };
 
+  // ✅ ดึงเวลาข้อมูลล่าสุดของแต่ละอุปกรณ์ แล้วรวมเป็นรายอาคาร
+  const fetchLastSeen = async () => {
+    try {
+      const { data: devices } = await supabase
+        .from("devices")
+        .select("id, building_id");
+      if (!devices) return;
+
+      const results = await Promise.all(
+        devices.map(async (d) => {
+          const { data } = await supabase
+            .from("energy_readings")
+            .select("reading_time")
+            .eq("device_id", d.id)
+            .order("reading_time", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          return {
+            buildingId: Number(d.building_id),
+            t: data?.reading_time ? new Date(data.reading_time).getTime() : null,
+          };
+        })
+      );
+
+      const map: Record<number, number | null> = {};
+      results.forEach(({ buildingId, t }) => {
+        const prev = map[buildingId];
+        if (t != null && (prev == null || t > prev)) map[buildingId] = t;
+        else if (!(buildingId in map)) map[buildingId] = null;
+      });
+      setLastSeen(map);
+      setSeenLoaded(true);
+    } catch (e) {
+      console.error("fetchLastSeen error:", e);
+    }
+  };
+
+  // ✅ สถานะที่ใช้แสดงจริง: ถ้าข้อมูลเงียบเกินกำหนดให้เป็น offline
+  const getEffectiveStatus = (b: Building) => {
+    if (!seenLoaded) return b.status; // ยังโหลดไม่เสร็จ ใช้ค่าเดิมไปก่อน ไม่ให้กระพริบ
+    const t = lastSeen[b.id];
+    if (t == null || Date.now() - t > OFFLINE_AFTER_MS) return "offline";
+    return b.status;
+  };
+
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(
     form.image_url || null
@@ -314,8 +369,13 @@ export default function AdminMapView() {
 
   useEffect(() => {
     fetchBuildings();
+    fetchLastSeen();
     const timer = setInterval(() => fetchBuildings(true), 30000);
-    return () => clearInterval(timer);
+    const seenTimer = setInterval(fetchLastSeen, 15000);
+    return () => {
+      clearInterval(timer);
+      clearInterval(seenTimer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -353,24 +413,24 @@ export default function AdminMapView() {
   };
 
   async function uploadBuildingImage(file: File): Promise<string> {
-  const formData = new FormData();
-  formData.append("file", file);
+    const formData = new FormData();
+    formData.append("file", file);
 
-  const token = getToken();
-  const res = await fetch(`${API_URL}/api/admin/upload`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
-  });
+    const token = getToken();
+    const res = await fetch(`${API_URL}/api/admin/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("Upload failed:", res.status, body);
-    throw new Error(body.message || `อัปโหลดรูปไม่สำเร็จ (${res.status})`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.error("Upload failed:", res.status, body);
+      throw new Error(body.message || `อัปโหลดรูปไม่สำเร็จ (${res.status})`);
+    }
+    const data = await res.json();
+    return data.url;
   }
-  const data = await res.json();
-  return data.url;
-}
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -429,6 +489,7 @@ export default function AdminMapView() {
       resetForm();
       setPanelOpen(false);
       await fetchBuildings();
+      await fetchLastSeen();
     } catch (err: any) {
       console.error(err);
       setError(err.message || "เกิดข้อผิดพลาดในการบันทึก");
@@ -564,37 +625,39 @@ export default function AdminMapView() {
 
         {buildings
           .filter((b) => b && b.lat != null && b.lng != null)
-          .map((building) => (
-            <Marker
-              key={building.id}
-              position={[Number(building.lat), Number(building.lng)]}
-              icon={getPinIcon(building.status)}
-              eventHandlers={{
-                click: () => handleMarkerClick(building),
-              }}
-            >
-              <Tooltip
-                direction="top"
-                offset={[0, -40]}
-                opacity={1}
-                permanent
-                className="!bg-white !border-none !shadow-lg !rounded-lg"
+          .map((building) => {
+            const status = getEffectiveStatus(building);
+            return (
+              <Marker
+                key={building.id}
+                position={[Number(building.lat), Number(building.lng)]}
+                icon={getPinIcon(status)}
+                eventHandlers={{
+                  click: () => handleMarkerClick(building),
+                }}
               >
-                <div className="text-sm min-w-[140px] p-1">
-                  <p className="font-semibold text-gray-800">{building.name}</p>
-                  {building.status && (
-                    <span
-                      className="inline-block text-[11px] font-bold px-2 py-0.5 rounded text-white mt-1"
-                      style={{ backgroundColor: getStatusColor(building.status) }}
-                    >
-                      {STATUS_LABEL[normalizeStatus(building.status)] ??
-                        building.status}
-                    </span>
-                  )}
-                </div>
-              </Tooltip>
-            </Marker>
-          ))}
+                <Tooltip
+                  direction="top"
+                  offset={[0, -40]}
+                  opacity={1}
+                  permanent
+                  className="!bg-white !border-none !shadow-lg !rounded-lg"
+                >
+                  <div className="text-sm min-w-[140px] p-1">
+                    <p className="font-semibold text-gray-800">{building.name}</p>
+                    {status && (
+                      <span
+                        className="inline-block text-[11px] font-bold px-2 py-0.5 rounded text-white mt-1"
+                        style={{ backgroundColor: getStatusColor(status) }}
+                      >
+                        {STATUS_LABEL[normalizeStatus(status)] ?? status}
+                      </span>
+                    )}
+                  </div>
+                </Tooltip>
+              </Marker>
+            );
+          })}
 
         {hasDraftLocation && (
           <Marker

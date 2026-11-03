@@ -471,18 +471,18 @@ export default function EnergyPage({ params }: { params: Promise<{ id: string }>
     if (deviceIds.length === 0) return;
     let cancelled = false;
 
-    const fetchHistory = async () => {
+    const fetchHistory = async (silent = false) => {
       try {
-        // ใช้ UTC ทั้งหมดเพื่อให้การบวกลบวันที่ไม่เพี้ยน
         const start = new Date(`${selectedDate}T00:00:00Z`);
         if (timeRange === '7d') start.setUTCDate(start.getUTCDate() - 6);
         else if (timeRange === '30d') start.setUTCDate(start.getUTCDate() - 29);
 
         const startDateStr = start.toISOString().split('T')[0];
-        const startOfPeriod = `${startDateStr}T00:00:00`;
-        const endOfPeriod = `${selectedDate}T23:59:59`;
-
-        const history = await fetchAllHistory(deviceIds, startOfPeriod, endOfPeriod);
+        const history = await fetchAllHistory(
+          deviceIds,
+          `${startDateStr}T00:00:00`,
+          `${selectedDate}T23:59:59`
+        );
         if (cancelled) return;
 
         setIngestData(history);
@@ -490,13 +490,21 @@ export default function EnergyPage({ params }: { params: Promise<{ id: string }>
       } catch (error) {
         console.error('Failed to fetch energy history:', error);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && !silent) setLoading(false);
       }
     };
 
     fetchHistory();
+
+    // รีเฟรชอัตโนมัติเฉพาะเมื่อช่วงที่ดูครอบคลุม "วันนี้"
+    const isIncludingToday = selectedDate === toLocalDateStr(new Date());
+    const interval = isIncludingToday
+      ? setInterval(() => fetchHistory(true), 30000) // 30 วินาทีพอ เพราะดึงหลายแถว
+      : null;
+
     return () => {
       cancelled = true;
+      if (interval) clearInterval(interval);
     };
   }, [deviceIds, selectedDate, timeRange]);
 
@@ -608,8 +616,8 @@ export default function EnergyPage({ params }: { params: Promise<{ id: string }>
             selectedDate={selectedDate}
           />
 
-          
-          <HourlyAverageChart buildingId={buildingId} selectedDate={selectedDate} />
+
+          <HourlyAverageChart buildingId={buildingId} selectedDate={selectedDate} timeRange={timeRange} />
         </div>
 
         {/* Charts Grid 2: Peak Demand และ Power Factor */}

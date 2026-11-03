@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Smart Energy Management System">
+  <rect width="128" height="128" rx="30" fill="#047857"/>
+  <!-- ไอคอนตึก -->
+  <g transform="translate(24 20) scale(3.2)" fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/>
+    <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/>
+    <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/>
+    <path d="M10 6h4"/>
+    <path d="M10 10h4"/>
+    <path d="M10 14h4"/>
+    <path d="M10 18h4"/>
+  </g>
+  <!-- ป้ายสายฟ้า -->
+  <circle cx="98" cy="98" r="22" fill="#facc15" stroke="#047857" stroke-width="6"/>
+  <path d="M102 83 L89 100 H97 L94 113 L107 95 H99 Z" fill="#047857" stroke="#047857" stroke-width="1.5" stroke-linejoin="round"/>
+</svg>

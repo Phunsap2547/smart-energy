@@ -263,10 +263,8 @@ export default function DailyEnergyChart({
       : 'การใช้พลังงานรายวัน (30 วันล่าสุด)';
 
   const avgLabel = timeRange === 'day' ? 'kWh/ชั่วโมง' : 'kWh/วัน';
-
   return (
-    /* 💡 ใส่ col-span-1 lg:col-span-2 ตรงนี้เพื่อให้ขยายเต็ม 2 คอลัมน์บนจอใหญ่ */
-    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col h-full"> {/* ✅ เปลี่ยน: เพิ่ม flex flex-col h-full */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-bold text-slate-800 text-sm">{chartTitle}</h3>
@@ -279,7 +277,7 @@ export default function DailyEnergyChart({
         </div>
       </div>
 
-      <div className="h-64 w-full flex items-center justify-center">
+      <div className="flex-1 min-h-[256px] w-full flex items-center justify-center"> {/* ✅ เปลี่ยน: จาก h-64 เป็น flex-1 min-h-[256px] */}
         {loading ? (
           <div className="text-xs text-slate-400">กำลังโหลดข้อมูล...</div>
         ) : data.length === 0 ? (
@@ -289,7 +287,7 @@ export default function DailyEnergyChart({
             <BarChart
               data={data}
               margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-              barCategoryGap={timeRange === '7d' ? '30%' : '10%'} // 💡 เพิ่มระยะห่างช่องไฟระหว่างแท่งเมื่อเป็น 7 วัน
+              barCategoryGap={timeRange === '7d' ? '30%' : '10%'}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
               <XAxis
@@ -317,7 +315,6 @@ export default function DailyEnergyChart({
                 }}
               />
 
-              {/* 💡 กำหนด maxBarSize เพื่อไม่ให้แท่งกราฟขยายกว้างเกินไปเมื่อข้อมูลมีน้อย */}
               <Bar
                 dataKey="energy"
                 radius={[6, 6, 0, 0]}
@@ -335,5 +332,5 @@ export default function DailyEnergyChart({
         )}
       </div>
     </div>
-  );
+  )
 }

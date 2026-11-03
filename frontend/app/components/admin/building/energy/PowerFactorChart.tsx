@@ -1,352 +1,4 @@
-// 'use client';
 
-// import React, { useState, useEffect } from 'react';
-// import {
-//   AreaChart,
-//   Area,
-//   XAxis,
-//   YAxis,
-//   CartesianGrid,
-//   Tooltip,
-//   ResponsiveContainer,
-//   ReferenceLine,
-// } from 'recharts';
-// import {
-//   Gauge,
-//   AlertTriangle,
-//   CheckCircle2,
-//   RefreshCw,
-//   ShieldAlert,
-//   TrendingUp,
-// } from 'lucide-react';
-// import { supabase } from '@/lib/supabase';
-
-// interface PowerFactorChartProps {
-//   buildingId: string;
-//   selectedDate?: string;
-//   timeRange?: 'day' | 'week';
-//   pfThreshold?: number;
-// }
-
-// interface PFPoint {
-//   time: string;
-//   fullTime: string;
-//   pfSystem: number;
-//   pfA: number | null;
-//   pfB: number | null;
-//   pfC: number | null;
-//   isAnomaly: boolean;
-// }
-
-// export default function PowerFactorChart({
-//   buildingId,
-//   selectedDate,
-//   timeRange = 'day',
-//   pfThreshold = 0.85,
-// }: PowerFactorChartProps) {
-//   const [loading, setLoading] = useState<boolean>(true);
-//   const [chartData, setChartData] = useState<PFPoint[]>([]);
-//   const [avgPf, setAvgPf] = useState<number>(0);
-//   const [minPf, setMinPf] = useState<number>(1);
-//   const [maxPf, setMaxPf] = useState<number>(0);
-//   const [anomalyCount, setAnomalyCount] = useState<number>(0);
-
-//   useEffect(() => {
-//     const fetchPFData = async () => {
-//       if (!buildingId) return;
-//       setLoading(true);
-
-//       try {
-//         // 1. ดึง Device IDs
-//         const { data: devices } = await supabase
-//           .from('devices')
-//           .select('id')
-//           .eq('building_id', buildingId);
-
-//         const deviceIds = devices?.map((d) => d.id) || [];
-//         if (deviceIds.length === 0) {
-//           setChartData([]);
-//           setLoading(false);
-//           return;
-//         }
-
-//         // 2. คำนวณช่วงเวลาแบบกำหนด Timezone ประเทศไทย (+07:00) ⚙️ [จุดแก้ที่ 1]
-//         const baseDate = selectedDate ? new Date(selectedDate) : new Date();
-//         const year = baseDate.getFullYear();
-//         const month = String(baseDate.getMonth() + 1).padStart(2, '0');
-//         const day = String(baseDate.getDate()).padStart(2, '0');
-
-//         let startDateStr = '';
-//         let endDateStr = '';
-
-//         if (timeRange === 'day') {
-//           startDateStr = `${year}-${month}-${day}T00:00:00.000+07:00`;
-//           endDateStr = `${year}-${month}-${day}T23:59:59.999+07:00`;
-//         } else {
-//           const pastDate = new Date(baseDate);
-//           pastDate.setDate(baseDate.getDate() - 6);
-//           const pYear = pastDate.getFullYear();
-//           const pMonth = String(pastDate.getMonth() + 1).padStart(2, '0');
-//           const pDay = String(pastDate.getDate()).padStart(2, '0');
-
-//           startDateStr = `${pYear}-${pMonth}-${pDay}T00:00:00.000+07:00`;
-//           endDateStr = `${year}-${month}-${day}T23:59:59.999+07:00`;
-//         }
-
-//         // 3. ดึงข้อมูลจาก Supabase พร้อมเพิ่ม Limit ⚙️ [จุดแก้ที่ 2]
-//         const { data: readings, error } = await supabase
-//           .from('energy_readings')
-//           .select('reading_time, power_factor, pf_a, pf_b, pf_c')
-//           .in('device_id', deviceIds)
-//           .gte('reading_time', startDateStr)
-//           .lte('reading_time', endDateStr)
-//           .order('reading_time', { ascending: true })
-//           .limit(10000); // 👈 ปลดล็อคลิมิต 1,000 แถวของ Supabase
-
-//         if (error || !readings || readings.length === 0) {
-//           setChartData([]);
-//           setLoading(false);
-//           return;
-//         }
-
-//         // 4. คำนวณค่าทางสถิติ (Min, Max, Avg, Anomaly)
-//         let sumPf = 0;
-//         let lowestPf = 1;
-//         let highestPf = 0;
-//         let anomalies = 0;
-
-//         const formattedData: PFPoint[] = readings.map((r) => {
-//           const date = new Date(r.reading_time);
-
-//           const timeStr = timeRange === 'week'
-//             ? date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) + ' ' + date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
-//             : date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-
-//           const fullTimeStr = date.toLocaleString('th-TH', {
-//             dateStyle: 'short',
-//             timeStyle: 'medium',
-//           });
-
-//           const pf = Math.min(1, Math.max(0, Number(r.power_factor ?? 0)));
-//           const isBelow = pf < pfThreshold;
-
-//           sumPf += pf;
-//           if (pf < lowestPf) lowestPf = pf;
-//           if (pf > highestPf) highestPf = pf;
-//           if (isBelow) anomalies++;
-
-//           return {
-//             time: timeStr,
-//             fullTime: fullTimeStr,
-//             pfSystem: pf,
-//             pfA: r.pf_a ? Number(r.pf_a) : null,
-//             pfB: r.pf_b ? Number(r.pf_b) : null,
-//             pfC: r.pf_c ? Number(r.pf_c) : null,
-//             isAnomaly: isBelow,
-//           };
-//         });
-
-//         setChartData(formattedData);
-//         setAvgPf(readings.length > 0 ? sumPf / readings.length : 0);
-//         setMinPf(readings.length > 0 ? lowestPf : 0);
-//         setMaxPf(readings.length > 0 ? highestPf : 0);
-//         setAnomalyCount(anomalies);
-//       } catch (err) {
-//         console.error('Fetch Power Factor Error:', err);
-//       } finally {
-//         setLoading(false);
-//       }
-//     };
-
-//     fetchPFData();
-//   }, [buildingId, selectedDate, timeRange, pfThreshold]);
-
-//   const formatNum = (val: number, decimals = 3) =>
-//     val.toLocaleString('th-TH', {
-//       minimumFractionDigits: decimals,
-//       maximumFractionDigits: decimals,
-//     });
-
-//   return (
-//     <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-5">
-//       {/* Header Section */}
-//       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-//         <div className="flex items-center gap-2.5">
-//           <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-//             <Gauge className="w-5 h-5" />
-//           </div>
-//           <div>
-//             <h2 className="text-base font-bold text-slate-800">
-//               Power Factor (PF) Report & Anomaly Detection
-//             </h2>
-//             <p className="text-xs text-slate-500">
-//               วิเคราะห์ประสิทธิภาพตัวประกอบกำลังไฟฟ้า ({timeRange === 'day' ? 'รายวัน' : 'รายสัปดาห์'}) เทียบเกณฑ์มาตรฐาน ({pfThreshold})
-//             </p>
-//           </div>
-//         </div>
-
-//         {/* Anomaly Badge */}
-//         {anomalyCount > 0 ? (
-//           <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl animate-pulse">
-//             <AlertTriangle className="w-4 h-4 text-amber-600" />
-//             <span className="text-xs font-bold">
-//               พบ PF ต่ำกว่าเกณฑ์ {anomalyCount} ครั้ง
-//             </span>
-//           </div>
-//         ) : (
-//           <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-xl">
-//             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-//             <span className="text-xs font-bold">คุณภาพ Power Factor ปกติ</span>
-//           </div>
-//         )}
-//       </div>
-
-//       {loading ? (
-//         <div className="h-64 flex items-center justify-center text-slate-400 gap-2">
-//           <RefreshCw className="w-5 h-5 animate-spin" />
-//           <span className="text-xs font-medium">กำลังวิเคราะห์ข้อมูล Power Factor...</span>
-//         </div>
-//       ) : chartData.length === 0 ? (
-//         <div className="h-64 flex items-center justify-center text-slate-400 text-xs">
-//           ไม่พบข้อมูล Power Factor ในช่วงเวลาที่เลือก
-//         </div>
-//       ) : (
-//         <>
-//           {/* Chart Container */}
-//           <div className="h-64 w-full">
-//             <ResponsiveContainer width="100%" height="100%">
-//               <AreaChart
-//                 data={chartData}
-//                 margin={{ top: 20, right: 20, left: -20, bottom: 0 }}
-//               >
-//                 <defs>
-//                   <linearGradient id="colorPf" x1="0" y1="0" x2="0" y2="1">
-//                     <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
-//                     <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
-//                   </linearGradient>
-//                 </defs>
-//                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-//                 <XAxis
-//                   dataKey="time"
-//                   tick={{ fontSize: 11, fill: '#94a3b8' }}
-//                   axisLine={false}
-//                   tickLine={false}
-//                 />
-//                 <YAxis
-//                   domain={[0.5, 1.0]}
-//                   tick={{ fontSize: 11, fill: '#94a3b8' }}
-//                   axisLine={false}
-//                   tickLine={false}
-//                 />
-//                 <Tooltip
-//                   content={({ active, payload }) => {
-//                     if (active && payload && payload.length) {
-//                       const data = payload[0].payload as PFPoint;
-//                       return (
-//                         <div className="bg-slate-900 text-white p-2.5 rounded-xl text-xs shadow-xl space-y-1">
-//                           <p className="text-slate-400 text-[10px]">{data.fullTime}</p>
-//                           <p className="font-semibold flex items-center gap-1.5">
-//                             <span className="w-2 h-2 rounded-full bg-indigo-400 inline-block" />
-//                             Power Factor: {formatNum(data.pfSystem)}
-//                           </p>
-//                           {data.isAnomaly && (
-//                             <span className="inline-block px-1.5 py-0.5 bg-amber-500/30 text-amber-300 font-bold text-[10px] rounded">
-//                               ⚠️ ต่ำกว่าเกณฑ์ {pfThreshold}
-//                             </span>
-//                           )}
-//                         </div>
-//                       );
-//                     }
-//                     return null;
-//                   }}
-//                 />
-
-//                 <ReferenceLine
-//                   y={pfThreshold}
-//                   stroke="#f59e0b"
-//                   strokeDasharray="4 4"
-//                   strokeWidth={1.5}
-//                   label={{
-//                     value: `เกณฑ์มาตรฐาน: ${pfThreshold}`,
-//                     fill: '#d97706',
-//                     fontSize: 10,
-//                     position: 'top',
-//                   }}
-//                 />
-
-//                 <Area
-//                   type="monotone"
-//                   dataKey="pfSystem"
-//                   stroke="#6366f1"
-//                   strokeWidth={2}
-//                   fillOpacity={1}
-//                   fill="url(#colorPf)"
-//                 />
-//               </AreaChart>
-//             </ResponsiveContainer>
-//           </div>
-
-//           {/* Cards สรุปสถานะ PF (4 การ์ด) */}
-//           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-//             <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
-//               <Gauge className="w-4 h-4 text-indigo-500" />
-//               <div>
-//                 <p className="text-[11px] text-slate-500">PF เฉลี่ยรวม</p>
-//                 <p className="text-xs font-bold text-slate-800">
-//                   {formatNum(avgPf)}
-//                 </p>
-//               </div>
-//             </div>
-
-//             <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
-//               <ShieldAlert className="w-4 h-4 text-amber-500" />
-//               <div>
-//                 <p className="text-[11px] text-slate-500">PF ต่ำสุดที่พบ</p>
-//                 <p
-//                   className={`text-xs font-bold ${
-//                     minPf < pfThreshold ? 'text-amber-600' : 'text-slate-800'
-//                   }`}
-//                 >
-//                   {formatNum(minPf)}
-//                 </p>
-//               </div>
-//             </div>
-
-//             <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
-//               <TrendingUp className="w-4 h-4 text-emerald-500" />
-//               <div>
-//                 <p className="text-[11px] text-slate-500">PF สูงสุดที่พบ</p>
-//                 <p className="text-xs font-bold text-emerald-600">
-//                   {formatNum(maxPf)}
-//                 </p>
-//               </div>
-//             </div>
-
-//             <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
-//               <AlertTriangle
-//                 className={`w-4 h-4 ${
-//                   anomalyCount > 0 ? 'text-rose-500' : 'text-emerald-500'
-//                 }`}
-//               />
-//               <div>
-//                 <p className="text-[11px] text-slate-500">ผลประเมินค่าปรับ PF</p>
-//                 <p
-//                   className={`text-xs font-bold ${
-//                     anomalyCount > 0 ? 'text-rose-600' : 'text-emerald-600'
-//                   }`}
-//                 >
-//                   {anomalyCount > 0 ? 'เสี่ยงถูกคิดค่าปรับ VAR' : 'อยู่ในเกณฑ์ปกติ'}
-//                 </p>
-//               </div>
-//             </div>
-//           </div>
-//         </>
-//       )}
-//     </div>
-//   );
-// }
-
-//PowerFactorChart.tsx
 //PowerFactorChart.tsx
 'use client';
 
@@ -433,7 +85,6 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
   useEffect(() => {
     let isSubscribed = true;
 
-    // อัปเดต state ภายใน + แจ้งหน้าหลักในที่เดียว
     const applyPf = (avg: number, max: number) => {
       if (!isSubscribed) return;
       setAvgPf(avg);
@@ -442,11 +93,11 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
       else onPfChangeRef.current?.(avg, 'avg');
     };
 
-    async function fetchPfData() {
+    async function fetchPfData(silent = false) {
       if (!buildingId) return;
 
       try {
-        setLoading(true);
+        if (!silent) setLoading(true);
 
         // 1. ดึง device_id ทั้งหมดของอาคารนี้
         const { data: devices, error: deviceError } = await supabase
@@ -570,14 +221,24 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
       } catch (err) {
         console.error('Error loading Power Factor chart:', err);
       } finally {
-        if (isSubscribed) setLoading(false);
+        if (isSubscribed && !silent) setLoading(false);
       }
     }
 
     fetchPfData();
 
+    // รีเฟรชอัตโนมัติเฉพาะเมื่อดู "วันนี้" (ข้อมูลย้อนหลังไม่เปลี่ยน)
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const isToday = !selectedDate || selectedDate === todayStr;
+
+    const interval = isToday
+      ? setInterval(() => fetchPfData(true), 30000)
+      : null;
+
     return () => {
       isSubscribed = false;
+      if (interval) clearInterval(interval);
     };
   }, [buildingId, timeRange, selectedDate, isMultiDay]);
 
@@ -603,11 +264,10 @@ export const PowerFactorChart: React.FC<PowerFactorChartProps> = ({
         </div>
 
         <div
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
-            isPenaltyRisk
-              ? 'bg-rose-50 border-rose-200 text-rose-700'
-              : 'bg-emerald-50 border-emerald-200 text-emerald-700'
-          }`}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${isPenaltyRisk
+            ? 'bg-rose-50 border-rose-200 text-rose-700'
+            : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+            }`}
         >
           <span className="text-sm font-medium">{isMultiDay ? 'PF สูงสุด:' : 'PF เฉลี่ย:'}</span>
           <span className="text-base font-bold">{isMultiDay ? maxPf : avgPf}</span>

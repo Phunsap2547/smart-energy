@@ -44,7 +44,12 @@ export function useOutageHistory(
       });
 
       if (error) {
-        console.error("get_device_outages error:", error);
+        console.error("get_device_outages error:", {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
         return;
       }
 

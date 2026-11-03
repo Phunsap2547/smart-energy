@@ -1,124 +1,3 @@
-// "use client";
-
-// import "leaflet/dist/leaflet.css";
-// import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
-// import L from "leaflet";
-// import { useRouter } from "next/navigation";
-// import { buildings } from "@/data/buildings";
-// import theme from "@/config/theme.js";
-// import Link from "next/link"; 
-// import { UserCircle2 } from "lucide-react"; 
-
-// // กำหนด Custom Marker Icon เพื่อแก้ปัญหาหมุดแสดงผลไม่ถูกต้องใน Next.js
-// const markerIcon = new L.Icon({
-//   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-//   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-//   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-//   iconSize: [25, 41],
-//   iconAnchor: [12, 41],
-//   popupAnchor: [1, -34],
-// });
-
-// // สีของ Status Badge
-// const statusColorMap: Record<string, string> = {
-//   Normal: theme.stats?.energyToday?.border || "#10b981",
-//   Warning: theme.stats?.powerFactor?.border || "#f59e0b",
-//   Critical: theme.stats?.status?.background || "#ef4444",
-// };
-
-// export default function LandingMap() {
-//   const router = useRouter();
-
-//   // กำหนดพิกัดเริ่มต้น พร้อม Fallback ป้องกันเว็บล่มกรณีที่ยังไม่มีข้อมูลในอาร์เรย์ buildings
-//   const defaultCenter: [number, number] =
-//     buildings.length > 0
-//       ? [buildings[0].lat, buildings[0].lng]
-//       : [13.7563, 100.5018];
-
-//   return (
-//     <div className="w-full h-screen relative">
-//       {/* Topbar ลอยด้านบนแผนที่ */}
-//       <div
-//         className="absolute top-0 left-0 right-0 z-[1000] px-6 py-3 shadow-md pointer-events-auto flex items-center justify-between "
-//         style={{
-//           background: `linear-gradient(90deg, ${theme.topbar.gradientFrom} 0%, ${theme.topbar.gradientTo} 100%)`,
-//         }}
-//       >
-//         {/* ฝั่งซ้าย: หัวข้อและรายละเอียด */}
-//         <div>
-//           <h1 className="text-white font-bold text-lg ml-10">
-//             Smart Energy Management System
-//           </h1>
-//           <p className="text-white/80 text-xs sm:text-sm ml-12">
-//             เลือกอาคารบนแผนที่เพื่อดูข้อมูลพลังงาน
-//           </p>
-//         </div>
-
-//         {/* ฝั่งขวา: ปุ่ม Admin */}
-//         <Link
-//           href="/admin/login"
-//           className="flex items-center justify-center gap-1.5 px-4 h-[36px] text-sm font-semibold transition-opacity hover:opacity-90 shrink-0"
-//           style={{
-//             background: theme.topbar.adminPillBg,
-//             color: theme.topbar.adminText,
-//             borderRadius: theme.radius.pill,
-//           }}
-//         >
-//           <UserCircle2 size={18} />
-//           <span>Admin</span>
-//         </Link>
-//       </div>
-
-//       {/* ตัวแสดงผลแผนที่ Leaflet */}
-//       <MapContainer
-//         center={defaultCenter}
-//         zoom={16}
-//         scrollWheelZoom={true}
-//         className="w-full h-full"
-//       >
-//         <TileLayer
-//           attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
-//           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-//         />
-
-//         {buildings.map((building) => (
-//           <Marker
-//             key={building.id}
-//             position={[building.lat, building.lng]}
-//             icon={markerIcon}
-//             eventHandlers={{
-//               click: () => router.push(`/building/${building.id}`),
-//             }}
-//           >
-//             <Tooltip
-//               direction="top"
-//               offset={[0, -35]}
-//               opacity={1}
-//               permanent
-//               className="!bg-white !border-none !shadow-lg !rounded-lg"
-//             >
-//               <div className="text-sm min-w-[140px] p-1">
-//                 <p className="font-semibold text-gray-800">{building.name}</p>
-//                 {building.status && (
-//                   <span
-//                     className="inline-block text-[11px] font-bold px-2 py-0.5 rounded text-white mt-1"
-//                     style={{
-//                       backgroundColor:
-//                         statusColorMap[building.status] || "#6b7280",
-//                     }}
-//                   >
-//                     {building.status}
-//                   </span>
-//                 )}
-//               </div>
-//             </Tooltip>
-//           </Marker>
-//         ))}
-//       </MapContainer>
-//     </div>
-//   );
-// }
-
 
 //LandingMap.tsx
 "use client";
@@ -141,6 +20,9 @@ interface Building {
   status?: string;
 }
 
+// ⏱️ ถ้าไม่มีข้อมูลเข้ามาเกินเวลานี้ จะแสดงเป็น Offline (ปรับให้ตรงกับเกณฑ์ใน useDeviceStatus)
+const OFFLINE_AFTER_MS = 3 * 60 * 1000; // 3 นาที
+
 // ✅ สีตามสถานะ (key เป็นตัวพิมพ์เล็กให้ตรงกับค่าใน buildings.status)
 const STATUS_COLOR: Record<string, string> = {
   normal: "#16a34a",   // เขียว
@@ -151,7 +33,7 @@ const STATUS_COLOR: Record<string, string> = {
 const DEFAULT_COLOR = "#6b7280"; // เทา (สถานะที่ไม่รู้จัก)
 
 const STATUS_LABEL: Record<string, string> = {
-  normal: "Normal",
+  normal: "Normal", 
   warning: "Warning",
   critical: "Critical",
   offline: "Offline",
@@ -313,6 +195,55 @@ export default function LandingMap() {
   const [loading, setLoading] = useState<boolean>(true);
   const [mapType, setMapType] = useState<MapType>("road");
 
+  // ✅ เวลาข้อมูลล่าสุดของแต่ละอาคาร (ms) ใช้เช็คสถานะ Offline
+  const [lastSeen, setLastSeen] = useState<Record<number, number | null>>({});
+  const [seenLoaded, setSeenLoaded] = useState(false);
+
+  // ✅ ดึงเวลาข้อมูลล่าสุดของแต่ละอุปกรณ์ แล้วรวมเป็นรายอาคาร
+  const fetchLastSeen = async () => {
+    try {
+      const { data: devices } = await supabase
+        .from("devices")
+        .select("id, building_id");
+      if (!devices) return;
+
+      const results = await Promise.all(
+        devices.map(async (d) => {
+          const { data } = await supabase
+            .from("energy_readings")
+            .select("reading_time")
+            .eq("device_id", d.id)
+            .order("reading_time", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          return {
+            buildingId: Number(d.building_id),
+            t: data?.reading_time ? new Date(data.reading_time).getTime() : null,
+          };
+        })
+      );
+
+      const map: Record<number, number | null> = {};
+      results.forEach(({ buildingId, t }) => {
+        const prev = map[buildingId];
+        if (t != null && (prev == null || t > prev)) map[buildingId] = t;
+        else if (!(buildingId in map)) map[buildingId] = null;
+      });
+      setLastSeen(map);
+      setSeenLoaded(true);
+    } catch (e) {
+      console.error("fetchLastSeen error:", e);
+    }
+  };
+
+  // ✅ สถานะที่ใช้แสดงจริง: ถ้าข้อมูลเงียบเกินกำหนดให้เป็น offline
+  const getEffectiveStatus = (b: Building) => {
+    if (!seenLoaded) return b.status; // ยังโหลดไม่เสร็จ ใช้ค่าเดิมไปก่อน ไม่ให้กระพริบ
+    const t = lastSeen[Number(b.id)];
+    if (t == null || Date.now() - t > OFFLINE_AFTER_MS) return "offline";
+    return b.status;
+  };
+
   useEffect(() => {
     async function fetchBuildings() {
       try {
@@ -332,13 +263,21 @@ export default function LandingMap() {
     }
 
     fetchBuildings();
+    fetchLastSeen();
 
-    // ✅ รีเฟรชสถานะอาคารทุก 30 วินาที
+    // ✅ รีเฟรชข้อมูลอาคารทุก 30 วินาที
     const timer = setInterval(async () => {
       const { data } = await supabase.from("buildings").select("*");
       if (data) setBuildings(data);
     }, 30000);
-    return () => clearInterval(timer);
+
+    // ✅ รีเฟรชเวลาข้อมูลล่าสุด (สถานะ Offline) ทุก 15 วินาที
+    const seenTimer = setInterval(fetchLastSeen, 15000);
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(seenTimer);
+    };
   }, []);
 
   const defaultCenter: [number, number] =
@@ -421,41 +360,43 @@ export default function LandingMap() {
               />
             )}
 
-            {buildings.map((building) => (
-              <Marker
-                key={building.id}
-                position={[building.lat, building.lng]}
-                icon={getPinIcon(building.status)}
-                eventHandlers={{
-                  click: () => router.push(`/building/${building.id}`),
-                }}
-              >
-                <Tooltip
-                  direction="top"
-                  offset={[0, -40]}
-                  opacity={1}
-                  permanent
-                  className="!bg-white !border-none !shadow-lg !rounded-lg"
+            {buildings.map((building) => {
+              const status = getEffectiveStatus(building);
+              return (
+                <Marker
+                  key={building.id}
+                  position={[building.lat, building.lng]}
+                  icon={getPinIcon(status)}
+                  eventHandlers={{
+                    click: () => router.push(`/building/${building.id}`),
+                  }}
                 >
-                  <div className="text-sm min-w-[140px] p-1">
-                    <p className="font-semibold text-gray-800">
-                      {building.name}
-                    </p>
-                    {building.status && (
-                      <span
-                        className="inline-block text-[11px] font-bold px-2 py-0.5 rounded text-white mt-1"
-                        style={{
-                          backgroundColor: getStatusColor(building.status),
-                        }}
-                      >
-                        {STATUS_LABEL[normalizeStatus(building.status)] ??
-                          building.status}
-                      </span>
-                    )}
-                  </div>
-                </Tooltip>
-              </Marker>
-            ))}
+                  <Tooltip
+                    direction="top"
+                    offset={[0, -40]}
+                    opacity={1}
+                    permanent
+                    className="!bg-white !border-none !shadow-lg !rounded-lg"
+                  >
+                    <div className="text-sm min-w-[140px] p-1">
+                      <p className="font-semibold text-gray-800">
+                        {building.name}
+                      </p>
+                      {status && (
+                        <span
+                          className="inline-block text-[11px] font-bold px-2 py-0.5 rounded text-white mt-1"
+                          style={{
+                            backgroundColor: getStatusColor(status),
+                          }}
+                        >
+                          {STATUS_LABEL[normalizeStatus(status)] ?? status}
+                        </span>
+                      )}
+                    </div>
+                  </Tooltip>
+                </Marker>
+              );
+            })}
           </MapContainer>
 
           {/* ปุ่มสลับประเภทแผนที่ */}

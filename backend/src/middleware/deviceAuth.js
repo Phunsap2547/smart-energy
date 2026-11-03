@@ -1,14 +1,3 @@
-// // backend/src/middleware/deviceAuth.js
-// const authenticateDevice = (req, res, next) => {
-//   const apiKey = req.headers['x-api-key'];
-//   if (!apiKey || apiKey !== process.env.DEVICE_API_KEY) {
-//     return res.status(401).json({ message: 'API key ไม่ถูกต้อง' });
-//   }
-//   next();
-// };
-
-// module.exports = authenticateDevice;
-
 
 // backend/src/middleware/deviceAuth.js
 // เวอร์ชัน debug ชั่วคราว — ใส่ console.log ไว้ดูว่าค่าที่เทียบกันคืออะไร

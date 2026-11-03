@@ -726,7 +726,7 @@ ML_STATUS_MAP = {
     OVER_LABEL: ("over_voltage", "high"),
     UNDER_LABEL: ("under_voltage", "high"),
     "⚫ ไฟดับ (Power Outage)": ("power_outage", "critical"),
-    "🌙 มีการใช้ไฟฟ้า (Night Usage)": ("night_usage", "warning"),
+    # "🌙 มีการใช้ไฟฟ้า (Night Usage)": ("night_usage", "warning"),
 }
 
 ML_PHASE_CONFIG = [
